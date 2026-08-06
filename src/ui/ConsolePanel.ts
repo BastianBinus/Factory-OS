@@ -11,6 +11,8 @@ export interface LogEntry {
   text: string;
   /** Set for errors; shown as a clickable `line 7`. */
   line?: number | null;
+  /** What to do about it, printed under the message in a quieter tone. */
+  detail?: string;
 }
 
 /** Old lines are dropped rather than kept forever — a loop can print fast. */
@@ -65,6 +67,14 @@ export class ConsolePanel {
     }
 
     this.list.appendChild(row);
+
+    if (entry.detail) {
+      const note = document.createElement('div');
+      note.className = `console__line console__line--${entry.kind} console__line--detail`;
+      note.textContent = entry.detail;
+      this.list.appendChild(note);
+    }
+
     while (this.list.childElementCount > MAX_LINES) this.list.firstElementChild?.remove();
 
     // Following the output is the point; jumping to the newest line is expected.
@@ -79,8 +89,8 @@ export class ConsolePanel {
     this.append({ kind: 'system', text });
   }
 
-  error(text: string, line: number | null = null): void {
-    this.append({ kind: 'error', text, line });
+  error(text: string, line: number | null = null, detail = ''): void {
+    this.append({ kind: 'error', text, line, detail });
   }
 
   clear(): void {

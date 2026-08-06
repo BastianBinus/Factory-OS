@@ -9,11 +9,12 @@ arrays, objects, `async`/`await` — explained in a short panel with a runnable 
 
 ## Status
 
-**Phase 3 of 8 — your code drives the robot.** Press `E` for the editor, write
-`while (true) { await move('north'); await mine(); }` and hit `Ctrl+Enter`. The script runs in a
-Web Worker, each command costs a tick, `Esc` stops it. The console under the editor shows
-`print()` output and errors with a clickable line number. The HUD is still scaffolding — phase 4
-turns it into the real thing and lights up the running line.
+**Phase 4 of 8 — you can see what your code is doing.** Press `E` for the editor, write
+`while (true) { await move('north'); await mine(); }` and hit `Ctrl+Enter`. The line the robot is
+executing lights up in tick rhythm, the HUD shows credits and cargo, and the console under the
+editor carries `print()` output and errors with a clickable line number. Errors are translated:
+a forgotten `await` and a command you have not unlocked both explain themselves instead of
+throwing raw JavaScript at you. `Esc` stops, `Reset` puts the floor back.
 
 ## Getting started
 
@@ -47,13 +48,15 @@ src/
                economy, progression, saveLoad — plain data, no DOM
   engine/      the clock and the bridge to the worker: TickScheduler, ActionQueue,
                ScriptRunner (worker lifecycle + watchdog), commands, dispatch,
-               lineMapper (stack trace to author line)
+               lineMapper (stack trace to author line), errorHints (raw error
+               to something a beginner can act on)
   worker/      sandbox.worker.ts (hardened worker, AsyncFunction), api.ts (the
                commands the player sees), protocol.ts (shared message types)
   render/      Three.js: Scene (camera, light, theme presets), meshFactory
                (procedural geometry), WorldView (state to scene), CameraControls
   style/       tokens.css is the single source of truth for the visual language
-  ui/          DOM components: Editor, CodePanel, ConsolePanel, ThemeToggle
+  ui/          DOM components: Hud, Controls, Editor, CodePanel, ConsolePanel,
+               Toast, ThemeToggle
   utils/       EventBus, safe localStorage helpers
   main.ts      app entry
   styleguide.ts  living styleguide page
@@ -87,6 +90,10 @@ themes recolours the factory without a second colour table.
   function shifts every line by an unknown amount, so the worker runs two probes with a known call
   line and solves for both the stack depth and the offset. If that fails, line numbers switch off
   silently and the game keeps running.
+- **An error is never replaced by an invented one.** `errorHints.ts` recognises a handful of
+  shapes — an unknown name, a syntax error, a blown call stack — and rewrites only those. Anything
+  it does not understand reaches the console word for word, because a confident wrong explanation
+  costs a learner more than a terse correct one.
 - **`GameState` is plain JSON.** That is what makes the save file the state verbatim, the whole
   rule set testable without a browser, and a cloud save in phase 8 a single column.
 
@@ -102,8 +109,8 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 1 | Headless game core: grid, recipes, economy, commands | done |
 | 2 | 3D world: scene, procedural meshes, camera | done |
 | 3 | Editor, worker sandbox, tick engine | done |
-| 4 | HUD, console, error experience, active-line highlight | next |
-| 5 | Economy, shop, tech tree, missions |  |
+| 4 | HUD, console, error experience, active-line highlight | done |
+| 5 | Economy, shop, tech tree, missions | next |
 | 6 | Guided learning panels, onboarding |  |
 | 7 | Polish and deploy to Vercel |  |
 | 8 | Supabase: auth, cloud saves, edge functions |  |

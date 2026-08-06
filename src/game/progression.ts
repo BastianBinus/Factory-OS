@@ -205,6 +205,11 @@ export function getMission(id: MissionId): MissionDef | undefined {
   return MISSIONS.find((mission) => mission.id === id);
 }
 
+/** Which tech-tree node grants a command, so an error can point at the shop. */
+export function unlockForCommand(command: string): UnlockDef | undefined {
+  return UNLOCKS.find((unlock) => unlock.commands?.includes(command));
+}
+
 /** Command names the player script may call right now. */
 export function unlockedCommands(state: GameState): string[] {
   // Always there: the readers cost nothing, and reset() is what makes a script

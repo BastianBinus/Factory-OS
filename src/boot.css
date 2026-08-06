@@ -1,13 +1,15 @@
 /*
- * Shell around the 3D viewport: the floating bars, the code overlay and the
- * console. The status bar at the top is still scaffolding — phase 4 turns it
- * into the real HUD.
+ * Shell around the 3D viewport: the HUD, the control bar, the code overlay, the
+ * console and the toast stack. Everything here floats above the canvas, which
+ * fills the window on its own.
  */
 
 .app {
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* The code overlay and the bars that step aside for it share one width. */
+  --panel-w: min(560px, 46vw);
 }
 
 .viewport {
@@ -36,12 +38,6 @@
   box-shadow: var(--sh-2);
 }
 
-.bar--top {
-  top: var(--sp-3);
-  left: 50%;
-  transform: translateX(-50%);
-}
-
 .bar--bottom {
   bottom: var(--sp-3);
   left: 50%;
@@ -49,6 +45,12 @@
   flex-wrap: wrap;
   justify-content: center;
   max-width: calc(100vw - var(--sp-5) * 2);
+  transition: left var(--t-base) var(--ease);
+}
+
+/* With the editor open the factory lives in the left half; the bars follow it. */
+.app--code-open .bar--bottom {
+  left: calc(50% - var(--panel-w) / 2);
 }
 
 .bar__sep {
@@ -63,6 +65,98 @@
   font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+/* HUD ---------------------------------------------------------------------- */
+
+.hud--top {
+  position: absolute;
+  z-index: 2;
+  top: var(--sp-3);
+  left: var(--sp-3);
+  right: var(--sp-3);
+  transition: right var(--t-base) var(--ease);
+}
+
+.app--code-open .hud--top {
+  right: calc(var(--panel-w) + var(--sp-3));
+}
+
+.hud__group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex: none;
+}
+
+.hud__cargo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hud__idle {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.hud__idle[hidden] {
+  display: none;
+}
+
+/* Toasts ------------------------------------------------------------------- */
+
+.toasts {
+  position: absolute;
+  z-index: 5;
+  right: var(--sp-3);
+  bottom: calc(var(--sp-3) + 56px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  pointer-events: none;
+}
+
+.toast {
+  animation: toast-in var(--t-base) var(--ease);
+  transition: opacity var(--t-base) var(--ease);
+}
+
+.toast--error {
+  border-left-color: var(--danger);
+}
+
+.toast--success {
+  border-left-color: var(--success);
+}
+
+.toast--leaving {
+  opacity: 0;
+}
+
+.toast__title {
+  font-weight: 600;
+}
+
+.toast__body {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Hover tooltip ------------------------------------------------------------ */
@@ -96,7 +190,7 @@
   z-index: 4;
   display: flex;
   flex-direction: column;
-  width: min(560px, 46vw);
+  width: var(--panel-w);
   background: var(--surface);
   border-left: 1px solid var(--border);
   border-radius: 14px 0 0 14px;
@@ -176,6 +270,14 @@
 .console__line--error {
   border-left-color: var(--danger);
   color: var(--danger);
+}
+
+/* The follow-up line under a message: same bar, quieter voice. */
+.console__line--detail {
+  padding-top: 0;
+  padding-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .console__jump {

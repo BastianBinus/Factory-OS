@@ -1,15 +1,15 @@
 import './style/index';
 import './boot.css';
-import { createThemeToggle, initTheme, onThemeChange } from './ui/ThemeToggle';
+import { initTheme, onThemeChange } from './ui/ThemeToggle';
 import { createInitialState, primaryRobot, resetWorld } from './game/GameState';
 import { unlockedCommands } from './game/progression';
-import { describeInventory } from './game/resources';
 import { advanceWorld } from './engine/commands';
 import { runCommand } from './engine/dispatch';
 import { ActionQueue } from './engine/ActionQueue';
 import { TickScheduler } from './engine/TickScheduler';
 import { ScriptRunner } from './engine/ScriptRunner';
 import type { StopReason } from './engine/ScriptRunner';
+import { explainError } from './engine/errorHints';
 import type { StateSnapshot } from './worker/protocol';
 import { readPalette } from './render/palette';
 import { Scene } from './render/Scene';
@@ -17,6 +17,9 @@ import { WorldView } from './render/WorldView';
 import type { HoverInfo } from './render/WorldView';
 import { CameraControls } from './render/CameraControls';
 import { CodePanel } from './ui/CodePanel';
+import { Controls } from './ui/Controls';
+import { Hud } from './ui/Hud';
+import { Toasts } from './ui/Toast';
 
 initTheme();
 
@@ -24,29 +27,15 @@ const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app container is missing from index.html');
 
 /*
- * Bootstrap. The status bar at the top is still scaffolding — phase 4 turns it
- * into the real HUD with resource pills and the mission tracker.
+ * Bootstrap. Everything visible is built here and wired to three things: the
+ * game state, the tick scheduler, and the worker the player's script runs in.
  */
 
 app.className = 'app';
 app.innerHTML = `
   <div class="viewport" id="viewport"></div>
-  <div class="bar bar--top">
-    <span class="t-label">Credits</span>
-    <span class="t-num" id="credits">0</span>
-    <span class="bar__sep"></span>
-    <span class="t-label">Tick</span>
-    <span class="t-num" id="tick">0</span>
-    <span class="bar__sep"></span>
-    <span class="bar__note" id="carrying">carrying nothing</span>
-    <span class="bar__sep"></span>
-    <span class="bar__theme"></span>
-  </div>
-  <div class="bar bar--bottom" id="controls"></div>
   <div class="tiletip" id="tiletip" hidden></div>
 `;
-
-app.querySelector('.bar__theme')?.replaceWith(createThemeToggle());
 
 /** The markup above is a constant, so a miss here is a typo, not a runtime case. */
 function required<T extends HTMLElement>(selector: string): T {
@@ -56,10 +45,6 @@ function required<T extends HTMLElement>(selector: string): T {
 }
 
 const viewport = required<HTMLDivElement>('#viewport');
-const controlBar = required<HTMLDivElement>('#controls');
-const creditsOut = required('#credits');
-const tickOut = required('#tick');
-const carryingOut = required('#carrying');
 const tooltip = required('#tiletip');
 
 const state = createInitialState();
@@ -84,10 +69,10 @@ try {
 }
 
 const worldView = new WorldView(scene, palette);
-const controls = new CameraControls(scene);
+const cameraControls = new CameraControls(scene);
 
 scene.frameGrid(state.grid.width, state.grid.height);
-controls.setBounds(state.grid.width, state.grid.height);
+cameraControls.setBounds(state.grid.width, state.grid.height);
 worldView.sync(state);
 scene.start((delta) => worldView.update(delta));
 
@@ -119,6 +104,7 @@ const runner = new ScriptRunner({
     // reset() is not something the robot does, so it never waits for a tick —
     // it is answered the moment it arrives, with the fresh world in the reply.
     if (action.command === 'reset') {
+      codePanel.editor.setRunningLine(action.line);
       resetFloor('Script reset the floor.');
       runner.resolve(action.id, null, snapshot());
       return;
@@ -135,21 +121,35 @@ const runner = new ScriptRunner({
     });
   },
 
-  onLog(text) {
+  onLog(text, line) {
+    // print() costs no tick, so this is the only moment its line is the live one.
+    codePanel.editor.setRunningLine(line);
     codePanel.console.print(text);
   },
 
   onError(error) {
-    codePanel.console.error(error.message, error.line);
+    reportError(error);
   },
 
   onStopped(reason) {
     scheduler.stop();
     queue.clear();
-    paintControls();
+    codePanel.editor.setRunningLine(null);
+    controls.update({ running: false, paused: false });
     codePanel.console.system(stopMessage(reason));
   },
 });
+
+/**
+ * A raw engine error becomes a sentence the player can act on, in the console
+ * where it can be re-read — and, if the editor is closed, as a toast, because a
+ * script that stopped for a reason nobody saw is the worst version of this.
+ */
+function reportError(error: { name: string; message: string; line: number | null }): void {
+  const hint = explainError(error, unlockedCommands(state));
+  codePanel.console.error(hint.message, hint.line, hint.detail);
+  if (!codePanel.isOpen) toasts.show(hint.message, hint.detail, 'error');
+}
 
 function stopMessage(reason: StopReason): string {
   switch (reason) {
@@ -182,6 +182,9 @@ function tick(): void {
   let outcome: { id: number; ok: boolean; value: unknown; error: string } | null = null;
 
   if (robot && action) {
+    // The highlight moves as the action runs, which is what makes it read as a
+    // program stepping rather than a robot wandering.
+    codePanel.editor.setRunningLine(action.line);
     const result = runCommand(action.command, { state, robot }, action.args);
     outcome = result.ok
       ? { id: action.id, ok: true, value: result.value, error: '' }
@@ -190,14 +193,17 @@ function tick(): void {
 
   advanceWorld(state);
   worldView.sync(state);
-  paintStatus();
+  hud.update(state);
 
   if (!outcome) return;
   if (outcome.ok) runner.resolve(outcome.id, outcome.value, snapshot());
   else runner.reject(outcome.id, outcome.error, snapshot());
 }
 
-// Controls ---------------------------------------------------------------------
+// Shell ------------------------------------------------------------------------
+
+const hud = new Hud({ parent: app });
+const toasts = new Toasts({ parent: app });
 
 const codePanel = new CodePanel({
   parent: app,
@@ -208,54 +214,29 @@ const codePanel = new CodePanel({
   },
   onRun: () => runScript(),
   onStop: () => stopScript(),
+  onToggle: (open) => {
+    // The bars move out from under the overlay so the factory stays readable.
+    app.classList.toggle('app--code-open', open);
+  },
 });
 
-const runButton = document.createElement('button');
-runButton.type = 'button';
-runButton.className = 'btn btn--primary';
-runButton.textContent = 'Run';
-runButton.title = 'Run the script (Ctrl+Enter)';
-runButton.addEventListener('click', () => runScript());
-
-const pauseButton = document.createElement('button');
-pauseButton.type = 'button';
-pauseButton.className = 'btn';
-pauseButton.textContent = 'Pause';
-pauseButton.addEventListener('click', () => {
-  if (scheduler.isPaused) scheduler.resume();
-  else scheduler.pause();
-  paintControls();
+const controls = new Controls({
+  parent: app,
+  onRun: () => runScript(),
+  onPause: () => {
+    if (scheduler.isPaused) scheduler.resume();
+    else scheduler.pause();
+    controls.update({ running: runner.running, paused: scheduler.isPaused });
+  },
+  onStop: () => stopScript(),
+  onReset: () => {
+    // A script mid-run is holding a promise about a world that is about to change
+    // under it, so the honest move is to end the run rather than lie to it.
+    if (runner.running) runner.stop('user');
+    resetFloor('Floor reset.');
+  },
+  onCode: () => codePanel.toggle(),
 });
-
-const stopButton = document.createElement('button');
-stopButton.type = 'button';
-stopButton.className = 'btn';
-stopButton.textContent = 'Stop';
-stopButton.title = 'Stop the script (Esc)';
-stopButton.addEventListener('click', () => stopScript());
-
-const resetButton = document.createElement('button');
-resetButton.type = 'button';
-resetButton.className = 'btn';
-resetButton.textContent = 'Reset';
-resetButton.title = 'Put the floor back to the start. Stops a running script.';
-resetButton.addEventListener('click', () => {
-  // A script mid-run is holding a promise about a world that is about to change
-  // under it, so the honest move is to end the run rather than lie to it.
-  if (runner.running) runner.stop('user');
-  resetFloor('Floor reset.');
-});
-
-const codeButton = document.createElement('button');
-codeButton.type = 'button';
-codeButton.className = 'btn';
-codeButton.textContent = 'Code';
-codeButton.title = 'Show or hide the editor (E)';
-codeButton.addEventListener('click', () => codePanel.toggle());
-
-const separator = document.createElement('span');
-separator.className = 'bar__sep';
-controlBar.append(runButton, pauseButton, stopButton, separator, resetButton, codeButton);
 
 /**
  * Back to the opening floor, keeping everything the player earned. Whatever was
@@ -266,43 +247,27 @@ function resetFloor(note: string): void {
   resetWorld(state);
   worldView.sync(state);
   worldView.snapRobots();
-  paintStatus();
+  hud.update(state);
   codePanel.console.system(note);
 }
 
 function runScript(): void {
   queue.clear();
+  codePanel.editor.setRunningLine(null);
   codePanel.console.system('Run started.');
   runner.start(codePanel.editor.value, unlockedCommands(state), snapshot());
   scheduler.setTickRate(state.tickRateMs);
   scheduler.start();
-  paintControls();
+  controls.update({ running: true, paused: false });
 }
 
 function stopScript(): void {
   if (!runner.running) {
     scheduler.stop();
-    paintControls();
+    controls.update({ running: false, paused: false });
     return;
   }
   runner.stop('user');
-}
-
-function paintControls(): void {
-  const running = runner.running;
-  runButton.disabled = running;
-  pauseButton.disabled = !running;
-  stopButton.disabled = !running;
-  pauseButton.textContent = scheduler.isPaused ? 'Resume' : 'Pause';
-}
-
-// Status -----------------------------------------------------------------------
-
-function paintStatus(): void {
-  const robot = primaryRobot(state);
-  creditsOut.textContent = String(state.credits);
-  tickOut.textContent = String(state.tick);
-  carryingOut.textContent = `carrying ${robot ? describeInventory(robot.inventory) : 'nothing'}`;
 }
 
 // Hover ------------------------------------------------------------------------
@@ -368,6 +333,6 @@ onThemeChange(() => {
   worldView.applyPalette(next);
 });
 
-paintStatus();
-paintControls();
+hud.update(state);
+controls.update({ running: false, paused: false });
 codePanel.console.system('Press E for the editor, then Ctrl+Enter to run.');

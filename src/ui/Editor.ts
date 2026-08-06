@@ -1,5 +1,6 @@
-import { EditorState, type Extension } from '@codemirror/state';
-import { EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
+import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
+import { Decoration, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
+import type { DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import {
   HighlightStyle,
@@ -65,6 +66,30 @@ function completionsFor(commands: string[]): Completion[] {
   });
 }
 
+/**
+ * The line the robot is executing right now. It is a separate decoration from
+ * CodeMirror's own active line, which follows the cursor — while a script runs,
+ * the two are usually nowhere near each other.
+ */
+const setRunningLine = StateEffect.define<number | null>();
+
+const RUNNING_LINE = Decoration.line({ class: 'cm-runningLine' });
+
+const runningLineField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, transaction) {
+    for (const effect of transaction.effects) {
+      if (!effect.is(setRunningLine)) continue;
+      const line = effect.value;
+      if (line === null || line < 1 || line > transaction.state.doc.lines) return Decoration.none;
+      return Decoration.set([RUNNING_LINE.range(transaction.state.doc.line(line).from)]);
+    }
+    // An edit while the script runs would leave the mark on the wrong text.
+    return transaction.docChanged ? Decoration.none : value;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 const THEME = EditorView.theme({
   '&': {
     height: '100%',
@@ -88,6 +113,10 @@ const THEME = EditorView.theme({
     paddingRight: 'var(--sp-2)',
   },
   '.cm-activeLine': { backgroundColor: 'var(--syn-active-line)' },
+  '.cm-runningLine': {
+    backgroundColor: 'var(--accent-soft)',
+    boxShadow: 'inset 2px 0 0 0 var(--accent)',
+  },
   '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--text-muted)' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
@@ -155,6 +184,7 @@ export class Editor {
       bracketMatching(),
       closeBrackets(),
       highlightActiveLine(),
+      runningLineField,
       autocompletion({ override: [(context) => this.complete(context)], icons: false }),
       javascript(),
       syntaxHighlighting(HIGHLIGHT),
@@ -194,6 +224,15 @@ export class Editor {
 
   focus(): void {
     this.view.focus();
+  }
+
+  /**
+   * Marks the line the robot is currently executing, or clears the mark with
+   * `null`. Out-of-range lines clear it too: a stale highlight on the wrong
+   * line is a lie, and no highlight is the honest fallback.
+   */
+  setRunningLine(line: number | null): void {
+    this.view.dispatch({ effects: setRunningLine.of(line) });
   }
 
   /** Puts the cursor on a line, used when a console error is clicked. */

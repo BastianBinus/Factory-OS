@@ -1,0 +1,161 @@
+.sg {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 var(--sp-5) var(--sp-8);
+}
+
+.sg__bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) 0;
+  margin-bottom: var(--sp-5);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.sg__bar-spacer {
+  flex: 1;
+}
+
+.sg__section {
+  padding: var(--sp-6) 0;
+  border-top: 1px solid var(--border);
+}
+
+.sg__section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.sg__section > h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: var(--sp-4);
+}
+
+.sg__note {
+  color: var(--text-muted);
+  margin: calc(var(--sp-4) * -1) 0 var(--sp-4);
+  max-width: 62ch;
+}
+
+.sg__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-3);
+}
+
+.sg__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.sg__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* Colour swatches -------------------------------------------------------- */
+
+.sw {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sw__chip {
+  height: 54px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+}
+
+.sw__name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.sw__value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Spacing / radius / shadow demos ---------------------------------------- */
+
+.sg__spacing {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-3);
+}
+
+.sg__spacing div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sg__spacing i {
+  display: block;
+  height: 28px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.sg__radius i,
+.sg__shadow i {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 60px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+.sg__shadow i {
+  border-color: transparent;
+}
+
+/* Component demo surfaces ------------------------------------------------ */
+
+.sg__demo {
+  padding: var(--sp-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+
+.sg__demo--flat {
+  background: var(--bg);
+}
+
+.sg__console {
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.sg__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--sp-3);
+}

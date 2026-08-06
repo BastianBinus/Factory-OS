@@ -1,0 +1,28 @@
+/* Temporary Phase 0 shell. Removed once the 3D viewport lands in Phase 2. */
+
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--sp-5);
+}
+
+.boot__card {
+  width: min(440px, 100%);
+}
+
+.boot__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.boot__actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.boot__actions .btn {
+  text-decoration: none;
+}

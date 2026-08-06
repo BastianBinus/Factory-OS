@@ -1,0 +1,244 @@
+import './style/index';
+import './styleguide.css';
+import { createThemeToggle, initTheme, onThemeChange } from './ui/ThemeToggle';
+
+initTheme();
+
+const SURFACES = ['bg', 'surface', 'surface-2', 'surface-sunk', 'border', 'border-strong'];
+const TEXT = ['text', 'text-muted', 'text-faint'];
+const ACCENT = ['accent', 'accent-hover', 'accent-ink', 'accent-soft'];
+const STATUS = ['danger', 'danger-soft', 'success', 'success-soft', 'info'];
+const WORLD = [
+  'w-floor',
+  'w-floor-alt',
+  'w-grid',
+  'w-metal',
+  'w-metal-dark',
+  'w-robot',
+  'w-ore-iron',
+  'w-ore-copper',
+  'w-ingot-iron',
+  'w-ingot-copper',
+  'w-gear',
+  'w-heat',
+  'w-sky',
+];
+
+function tokenValue(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();
+}
+
+/** Swatches read their own value back from CSS, so they cannot drift from tokens.css. */
+function swatchGrid(names: string[]): string {
+  const cells = names
+    .map(
+      (name) => `
+        <div class="sw" data-token="${name}">
+          <div class="sw__chip" style="background: var(--${name})"></div>
+          <span class="sw__name">--${name}</span>
+          <span class="sw__value">${tokenValue(name)}</span>
+        </div>`,
+    )
+    .join('');
+  return `<div class="sg__grid">${cells}</div>`;
+}
+
+function section(title: string, body: string, note?: string): string {
+  return `
+    <section class="sg__section">
+      <h2>${title}</h2>
+      ${note ? `<p class="sg__note t-body">${note}</p>` : ''}
+      ${body}
+    </section>`;
+}
+
+const root = document.querySelector<HTMLDivElement>('#styleguide');
+if (!root) throw new Error('#styleguide container is missing');
+
+function render(): void {
+  if (!root) return;
+  root.innerHTML = `
+    <div class="sg">
+      <header class="sg__bar">
+        <span class="t-label">Factory OS · Styleguide</span>
+        <span class="sg__bar-spacer"></span>
+        <a class="btn btn--ghost" href="/">Back to app</a>
+        <span class="js-theme-toggle"></span>
+      </header>
+
+      ${section(
+        'Surfaces',
+        swatchGrid(SURFACES),
+        'Panels are defined by a 1px border plus a surface step — not by heavy shadows. Shadows are reserved for elements that genuinely float above the world.',
+      )}
+
+      ${section('Text', swatchGrid(TEXT))}
+
+      ${section(
+        'Accent',
+        swatchGrid(ACCENT),
+        'Yellow appears on the robot, on exactly one primary button per screen, and on active states. Never as a panel background — the look depends on it staying rare.',
+      )}
+
+      ${section('Status', swatchGrid(STATUS))}
+
+      ${section(
+        'World',
+        swatchGrid(WORLD),
+        'The 3D renderer reads these at runtime via getComputedStyle, which is why switching the theme recolours the factory without a second colour table.',
+      )}
+
+      ${section(
+        'Typography',
+        `<div class="sg__stack">
+          <div class="t-label">Label · 11 / 600 / uppercase</div>
+          <div class="t-display">Display · 20 / 600 — Assembler online</div>
+          <div class="t-title">Title · 15 / 600 — Production chain</div>
+          <div class="t-body">Body · 13 / 450 — The robot mines ore, carries it to the smelter and sells the ingots at the market.</div>
+          <div class="t-prose">Prose · 14 / 1.65 — Used inside concept panels, where the text is meant to be read rather than scanned.</div>
+          <div class="t-num">Numeric · 15 / 600 / tabular — 1 240 cr · 0041 ticks</div>
+          <pre class="concept__code">while (true) {
+  await move('north');
+  if (await scan() === 'iron_ore') {
+    await mine();
+  }
+}</pre>
+        </div>`,
+        'Every number in the HUD uses tabular figures. Without them the bar jitters on every tick. Mono ligatures are switched off so a learner sees <code>=&gt;</code> as two characters.',
+      )}
+
+      ${section(
+        'Spacing',
+        `<div class="sg__spacing">
+          ${[1, 2, 3, 4, 5, 6, 7, 8]
+            .map(
+              (step) =>
+                `<div><i style="width: var(--sp-${step})"></i><span>sp-${step} · ${tokenValue(`sp-${step}`)}</span></div>`,
+            )
+            .join('')}
+        </div>`,
+      )}
+
+      ${section(
+        'Radius & elevation',
+        `<div class="sg__row sg__radius">
+          ${['control', 'card', 'panel']
+            .map((key) => `<i style="border-radius: var(--r-${key})">r-${key}</i>`)
+            .join('')}
+          <i style="border-radius: var(--r-pill)">r-pill</i>
+        </div>
+        <div class="sg__row sg__shadow" style="margin-top: var(--sp-4)">
+          ${[1, 2, 3].map((level) => `<i style="box-shadow: var(--sh-${level})">sh-${level}</i>`).join('')}
+        </div>`,
+      )}
+
+      ${section(
+        'Buttons',
+        `<div class="sg__demo sg__demo--flat sg__stack">
+          <div class="sg__row">
+            <button class="btn btn--primary">Run</button>
+            <button class="btn">Pause</button>
+            <button class="btn btn--ghost">Missions</button>
+            <button class="btn btn--danger">Stop</button>
+            <button class="btn" disabled>Unavailable</button>
+          </div>
+          <div class="sg__row">
+            <div class="btn-group">
+              <button class="btn btn--primary">Run</button>
+              <button class="btn">Pause</button>
+              <button class="btn">Stop</button>
+              <span class="btn-group__sep"></span>
+              <button class="btn">Code</button>
+              <button class="btn">Shop</button>
+              <button class="btn">Missions</button>
+            </div>
+          </div>
+          <div class="sg__row t-body t-muted">
+            Shortcuts: <kbd>E</kbd> code · <kbd>Ctrl</kbd>+<kbd>↵</kbd> run · <kbd>Esc</kbd> stop
+          </div>
+        </div>`,
+      )}
+
+      ${section(
+        'HUD',
+        `<div class="sg__demo">
+          <div class="hud">
+            <span class="hud__credits">1 240 <span class="t-label">cr</span></span>
+            <span class="pill"><span class="pill__dot" style="background: var(--w-ore-iron)"></span><span class="pill__label">iron ore</span><span class="pill__value">12</span></span>
+            <span class="pill"><span class="pill__dot" style="background: var(--w-ingot-copper)"></span><span class="pill__label">copper ingot</span><span class="pill__value">4</span></span>
+            <span class="pill"><span class="pill__dot" style="background: var(--w-gear)"></span><span class="pill__label">gear</span><span class="pill__value">0</span></span>
+            <span class="hud__spacer"></span>
+            <span class="hud__tick">tick 0041</span>
+            <span class="js-theme-toggle"></span>
+          </div>
+        </div>`,
+      )}
+
+      ${section(
+        'Shop cards',
+        `<div class="sg__cards">
+          <div class="card card--affordable">
+            <div class="card__head"><span class="t-title">scan()</span><span class="card__price">120 cr</span></div>
+            <p class="t-body t-muted">Read what is on the tile the robot stands on.</p>
+          </div>
+          <div class="card">
+            <div class="card__head"><span class="t-title">craft()</span><span class="card__price">400 cr</span></div>
+            <p class="t-body t-muted">Start the machine on the current tile.</p>
+          </div>
+          <div class="card card--owned">
+            <div class="card__head"><span class="t-title">mine()</span><span class="card__check">Owned</span></div>
+            <p class="t-body t-muted">Extract ore from the current tile.</p>
+          </div>
+          <div class="card card--locked">
+            <div class="card__head"><span class="t-title">Second robot</span><span class="card__price">2 000 cr</span></div>
+            <p class="t-body">Requires mission 6.</p>
+          </div>
+        </div>`,
+      )}
+
+      ${section(
+        'Console',
+        `<div class="sg__console console">
+          <div class="console__line">mined iron_ore at 3,5</div>
+          <div class="console__line console__line--system">tick 41 · moved north</div>
+          <div class="console__line console__line--success">sold 4 iron_ingot for 44 cr</div>
+          <div class="console__line console__line--error">Command 'mine' was called while 'move' was still running. Did you forget 'await' on <button class="console__ref">line 4</button>?</div>
+        </div>`,
+        'Errors are rewritten into something a beginner can act on. The raw JavaScript message is kept underneath, never shown first.',
+      )}
+
+      ${section(
+        'Concept panel & toast',
+        `<div class="sg__demo sg__row" style="align-items: flex-start">
+          <div class="panel concept">
+            <div class="panel__head">
+              <span class="t-label">New concept</span>
+              <span class="t-label">2 of 9</span>
+            </div>
+            <div class="panel__body sg__stack">
+              <h3 class="t-display">The while loop</h3>
+              <p class="t-prose">A loop repeats a block of code for as long as its condition stays true. <code>while (true)</code> never stops on its own — which is exactly what you want for a robot that should keep working.</p>
+              <pre class="concept__code">while (true) {
+  await move('north');
+  await mine();
+}</pre>
+              <div class="sg__row"><button class="btn btn--primary">Got it</button></div>
+            </div>
+          </div>
+          <div class="toast">
+            <span class="t-label">Unlocked</span>
+            <span class="t-body"><code>scan()</code> is now available in the editor.</span>
+          </div>
+        </div>`,
+      )}
+    </div>
+  `;
+
+  for (const slot of root.querySelectorAll('.js-theme-toggle')) {
+    slot.replaceWith(createThemeToggle());
+  }
+}
+
+render();
+// Swatch labels print live values, so re-render when the palette changes.
+onThemeChange(render);

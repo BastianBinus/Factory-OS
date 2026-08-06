@@ -90,7 +90,20 @@ export function createRobot(id: string, x: number, y: number): Robot {
   return { id, x, y, facing: 'south', inventory: {} };
 }
 
-/** Where robot number `index` parks at the start of a run. */
+/**
+ * Where robot number `index` parks at the start of a run.
+ *
+ * Not the middle of the floor, and deliberately so. It is one tile off the
+ * market in the north-west corner, which is where selling happens and where the
+ * corner stays no matter how far the grid later grows to the south-east — a
+ * start point defined as "the centre" would wander with every grid upgrade while
+ * the market did not.
+ *
+ * It is also load-bearing for the tutorial: column x = 1 is the only column in
+ * `INITIAL_LAYOUT` where walking south runs into ore (copper at 1,6), which is
+ * exactly what the commented-out starter script does. Moving this without moving
+ * that ore leaves a new player's first script walking into a wall.
+ */
 function startPosition(index: number): { x: number; y: number } {
   return { x: 1 + index, y: 1 };
 }

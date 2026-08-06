@@ -9,9 +9,10 @@ arrays, objects, `async`/`await` — explained in a short panel with a runnable 
 
 ## Status
 
-**Phase 1 of 8 — the rules of the game are complete and tested, but nothing is on screen yet.**
-The whole simulation runs headlessly: a test plays a full round — mine, smelt, assemble, sell,
-buy an upgrade — through function calls alone.
+**Phase 2 of 8 — the factory is on screen.** The headless rules from phase 1 now render as a
+3D floor with ore, a smelter, an assembler, a market and a robot that glides between tiles.
+A temporary debug bar at the bottom drives the robot by hand; phase 3 hands that job to your
+script.
 
 ## Getting started
 
@@ -44,6 +45,8 @@ src/
   game/        the rules: types, GameState, grid, resources, recipes,
                economy, progression, saveLoad — plain data, no DOM
   engine/      commands.ts today; tick scheduler and worker bridge in phase 3
+  render/      Three.js: Scene (camera, light, theme presets), meshFactory
+               (procedural geometry), WorldView (state to scene), CameraControls
   style/       tokens.css is the single source of truth for the visual language
   ui/          DOM components (theme toggle today, HUD/editor/panels later)
   utils/       EventBus, safe localStorage helpers
@@ -69,6 +72,9 @@ themes recolours the factory without a second colour table.
 - **Every command costs exactly one tick.** Machines carry an input and an output buffer, so
   `craft()` only *starts* the furnace and returns immediately — the robot can walk away and pick
   the ingots up later with `take()`. Nothing in the engine has to model an action spanning ticks.
+- **No external 3D assets.** Every mesh is built from `BoxGeometry`/`ExtrudeGeometry` in
+  `meshFactory.ts`, so the whole factory is a few kilobytes of code with nothing to download and
+  nothing to keep in sync with the palette.
 - **`GameState` is plain JSON.** That is what makes the save file the state verbatim, the whole
   rule set testable without a browser, and a cloud save in phase 8 a single column.
 
@@ -82,8 +88,8 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 |---|---|---|
 | 0 | Foundation, design tokens, theme system, styleguide | done |
 | 1 | Headless game core: grid, recipes, economy, commands | done |
-| 2 | 3D world: scene, procedural meshes, camera | next |
-| 3 | Editor, worker sandbox, tick engine |  |
+| 2 | 3D world: scene, procedural meshes, camera | done |
+| 3 | Editor, worker sandbox, tick engine | next |
 | 4 | HUD, console, error experience, active-line highlight |  |
 | 5 | Economy, shop, tech tree, missions |  |
 | 6 | Guided learning panels, onboarding |  |

@@ -1,4 +1,5 @@
 import type { GameState, Grid, Robot, Tile, UnlockId } from './types';
+import { expandGrid } from './grid';
 
 export const SAVE_VERSION = 1;
 
@@ -73,13 +74,19 @@ export function createRobot(id: string, x: number, y: number): Robot {
   return { id, x, y, facing: 'south', inventory: {} };
 }
 
+/** Where robot number `index` parks at the start of a run. */
+function startPosition(index: number): { x: number; y: number } {
+  return { x: 1 + index, y: 1 };
+}
+
 export function createInitialState(): GameState {
+  const start = startPosition(0);
   return {
     version: SAVE_VERSION,
     tick: 0,
     credits: 0,
     grid: gridFromLayout(INITIAL_LAYOUT),
-    robots: [createRobot('r1', 1, 1)],
+    robots: [createRobot('r1', start.x, start.y)],
     unlocks: [...STARTING_UNLOCKS],
     completedMissions: [],
     seenConcepts: [],
@@ -89,6 +96,31 @@ export function createInitialState(): GameState {
     inventoryCapacity: DEFAULT_CAPACITY,
     oreRegrowTicks: DEFAULT_REGROW_TICKS,
   };
+}
+
+/**
+ * Puts the factory floor back to how a run finds it: robots parked, ore full,
+ * machines and inventories empty, tick counter at zero.
+ *
+ * What it deliberately leaves alone is everything the player *earned* — credits,
+ * unlocks, mission progress, the lifetime stats those missions count, and the
+ * grid size. Resetting is for making a script repeatable, not for giving up
+ * progress; that distinction is the whole reason this is not `createInitialState`.
+ */
+export function resetWorld(state: GameState): void {
+  // expandGrid is seeded by the grid size, so a rebuilt 12x12 is the same 12x12.
+  const size = Math.max(state.grid.width, state.grid.height);
+  state.grid = expandGrid(gridFromLayout(INITIAL_LAYOUT), size, ORE_NODE_AMOUNT);
+
+  state.robots.forEach((robot, index) => {
+    const start = startPosition(index);
+    robot.x = start.x;
+    robot.y = start.y;
+    robot.facing = 'south';
+    robot.inventory = {};
+  });
+
+  state.tick = 0;
 }
 
 export function getRobot(state: GameState, id: string): Robot | undefined {

@@ -42,6 +42,10 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
   position: { detail: 'position()', info: 'The robot position as {x, y}. Costs no tick.' },
   inventory: { detail: 'inventory()', info: 'What the robot carries. Costs no tick.' },
   credits: { detail: 'credits()', info: 'Your credits right now. Costs no tick.' },
+  reset: {
+    detail: 'await reset()',
+    info: 'Put the floor back to the start: robot parked, ore full, machines empty. Your credits and unlocks stay. Costs no tick.',
+  },
 };
 
 /** Commands that block are worth spelling out with their `await`. */

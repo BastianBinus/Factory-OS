@@ -1,7 +1,7 @@
 import './style/index';
 import './boot.css';
 import { createThemeToggle, initTheme, onThemeChange } from './ui/ThemeToggle';
-import { createInitialState, primaryRobot } from './game/GameState';
+import { createInitialState, primaryRobot, resetWorld } from './game/GameState';
 import { unlockedCommands } from './game/progression';
 import { describeInventory } from './game/resources';
 import { advanceWorld } from './engine/commands';
@@ -116,6 +116,14 @@ const runner = new ScriptRunner({
   },
 
   onAction(action) {
+    // reset() is not something the robot does, so it never waits for a tick —
+    // it is answered the moment it arrives, with the fresh world in the reply.
+    if (action.command === 'reset') {
+      resetFloor('Script reset the floor.');
+      runner.resolve(action.id, null, snapshot());
+      return;
+    }
+
     const robot = primaryRobot(state);
     if (!robot) return;
     queue.push({
@@ -226,6 +234,18 @@ stopButton.textContent = 'Stop';
 stopButton.title = 'Stop the script (Esc)';
 stopButton.addEventListener('click', () => stopScript());
 
+const resetButton = document.createElement('button');
+resetButton.type = 'button';
+resetButton.className = 'btn';
+resetButton.textContent = 'Reset';
+resetButton.title = 'Put the floor back to the start. Stops a running script.';
+resetButton.addEventListener('click', () => {
+  // A script mid-run is holding a promise about a world that is about to change
+  // under it, so the honest move is to end the run rather than lie to it.
+  if (runner.running) runner.stop('user');
+  resetFloor('Floor reset.');
+});
+
 const codeButton = document.createElement('button');
 codeButton.type = 'button';
 codeButton.className = 'btn';
@@ -235,7 +255,20 @@ codeButton.addEventListener('click', () => codePanel.toggle());
 
 const separator = document.createElement('span');
 separator.className = 'bar__sep';
-controlBar.append(runButton, pauseButton, stopButton, separator, codeButton);
+controlBar.append(runButton, pauseButton, stopButton, separator, resetButton, codeButton);
+
+/**
+ * Back to the opening floor, keeping everything the player earned. Whatever was
+ * queued belongs to the old world and goes with it.
+ */
+function resetFloor(note: string): void {
+  queue.clear();
+  resetWorld(state);
+  worldView.sync(state);
+  worldView.snapRobots();
+  paintStatus();
+  codePanel.console.system(note);
+}
 
 function runScript(): void {
   queue.clear();

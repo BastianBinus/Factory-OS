@@ -37,7 +37,16 @@ describe('tables', () => {
 
   it('gives the player exactly move, mine and print to start with', () => {
     const state = createInitialState();
-    expect(unlockedCommands(state)).toEqual(['credits', 'inventory', 'mine', 'move', 'position', 'print']);
+    // The readers and reset() are never locked, so they are always in the list.
+    expect(unlockedCommands(state)).toEqual([
+      'credits',
+      'inventory',
+      'mine',
+      'move',
+      'position',
+      'print',
+      'reset',
+    ]);
   });
 
   it('exposes both craft and take from one unlock', () => {

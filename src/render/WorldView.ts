@@ -273,6 +273,22 @@ export class WorldView {
     }
   }
 
+  /**
+   * Puts robots exactly where the state says with no glide. Used after a reset,
+   * where sliding home across the whole floor would read as a journey the robot
+   * never made.
+   */
+  snapRobots(): void {
+    for (const view of this.robots.values()) {
+      view.fromX = view.toX;
+      view.fromY = view.toY;
+      view.fromAngle = view.toAngle;
+      view.t = 1;
+      view.group.position.set(view.toX, 0, view.toY);
+      view.group.rotation.y = view.toAngle;
+    }
+  }
+
   // Frame -------------------------------------------------------------------
 
   update(delta: number): void {

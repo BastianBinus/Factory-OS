@@ -207,7 +207,9 @@ export function getMission(id: MissionId): MissionDef | undefined {
 
 /** Command names the player script may call right now. */
 export function unlockedCommands(state: GameState): string[] {
-  const names = new Set<string>(['position', 'inventory', 'credits']);
+  // Always there: the readers cost nothing, and reset() is what makes a script
+  // repeatable — locking that behind progress would only teach patience.
+  const names = new Set<string>(['position', 'inventory', 'credits', 'reset']);
   for (const id of state.unlocks) {
     for (const command of getUnlock(id)?.commands ?? []) names.add(command);
   }

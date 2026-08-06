@@ -47,6 +47,7 @@ export const UNLOCKS: UnlockDef[] = [
     label: 'wait()',
     description: 'Do nothing for a number of ticks — useful while a machine is running.',
     cost: 80,
+    commands: ['wait'],
   },
   {
     id: 'scan',

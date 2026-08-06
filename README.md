@@ -9,10 +9,11 @@ arrays, objects, `async`/`await` — explained in a short panel with a runnable 
 
 ## Status
 
-**Phase 2 of 8 — the factory is on screen.** The headless rules from phase 1 now render as a
-3D floor with ore, a smelter, an assembler, a market and a robot that glides between tiles.
-A temporary debug bar at the bottom drives the robot by hand; phase 3 hands that job to your
-script.
+**Phase 3 of 8 — your code drives the robot.** Press `E` for the editor, write
+`while (true) { await move('north'); await mine(); }` and hit `Ctrl+Enter`. The script runs in a
+Web Worker, each command costs a tick, `Esc` stops it. The console under the editor shows
+`print()` output and errors with a clickable line number. The HUD is still scaffolding — phase 4
+turns it into the real thing and lights up the running line.
 
 ## Getting started
 
@@ -44,11 +45,15 @@ phase has been done by hand.
 src/
   game/        the rules: types, GameState, grid, resources, recipes,
                economy, progression, saveLoad — plain data, no DOM
-  engine/      commands.ts today; tick scheduler and worker bridge in phase 3
+  engine/      the clock and the bridge to the worker: TickScheduler, ActionQueue,
+               ScriptRunner (worker lifecycle + watchdog), commands, dispatch,
+               lineMapper (stack trace to author line)
+  worker/      sandbox.worker.ts (hardened worker, AsyncFunction), api.ts (the
+               commands the player sees), protocol.ts (shared message types)
   render/      Three.js: Scene (camera, light, theme presets), meshFactory
                (procedural geometry), WorldView (state to scene), CameraControls
   style/       tokens.css is the single source of truth for the visual language
-  ui/          DOM components (theme toggle today, HUD/editor/panels later)
+  ui/          DOM components: Editor, CodePanel, ConsolePanel, ThemeToggle
   utils/       EventBus, safe localStorage helpers
   main.ts      app entry
   styleguide.ts  living styleguide page
@@ -75,6 +80,13 @@ themes recolours the factory without a second colour table.
 - **No external 3D assets.** Every mesh is built from `BoxGeometry`/`ExtrudeGeometry` in
   `meshFactory.ts`, so the whole factory is a few kilobytes of code with nothing to download and
   nothing to keep in sync with the palette.
+- **Locked commands do not exist.** The unlocked names are passed to the compiled script as
+  function parameters, so `move(...)` is a bare call and a locked name fails with the honest
+  `scan is not defined` rather than a special-case check.
+- **Line numbers are calibrated, never guessed.** The wrapper an engine puts around a compiled
+  function shifts every line by an unknown amount, so the worker runs two probes with a known call
+  line and solves for both the stack depth and the offset. If that fails, line numbers switch off
+  silently and the game keeps running.
 - **`GameState` is plain JSON.** That is what makes the save file the state verbatim, the whole
   rule set testable without a browser, and a cloud save in phase 8 a single column.
 
@@ -89,8 +101,8 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 0 | Foundation, design tokens, theme system, styleguide | done |
 | 1 | Headless game core: grid, recipes, economy, commands | done |
 | 2 | 3D world: scene, procedural meshes, camera | done |
-| 3 | Editor, worker sandbox, tick engine | next |
-| 4 | HUD, console, error experience, active-line highlight |  |
+| 3 | Editor, worker sandbox, tick engine | done |
+| 4 | HUD, console, error experience, active-line highlight | next |
 | 5 | Economy, shop, tech tree, missions |  |
 | 6 | Guided learning panels, onboarding |  |
 | 7 | Polish and deploy to Vercel |  |

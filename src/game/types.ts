@@ -96,6 +96,16 @@ export type UnlockId =
   | 'tick_120'
   | 'robot_2';
 
+export type ConceptId = 'await' | 'while' | 'if_else' | 'functions' | 'arrays' | 'objects' | 'for_of';
+
+export interface ConceptDef {
+  id: ConceptId;
+  title: string;
+  /** Two to four sentences. Prose, not a reference entry. */
+  body: string;
+  codeExample: string;
+}
+
 export interface UnlockDef {
   id: UnlockId;
   label: string;
@@ -108,7 +118,7 @@ export interface UnlockDef {
   /** Other unlocks that must be owned first. */
   requiresUnlocks?: UnlockId[];
   /** JS concept explained when this unlock becomes available. */
-  conceptId?: string;
+  conceptId?: ConceptId;
 }
 
 export type MissionId = 'm1_move' | 'm2_mine' | 'm3_earn' | 'm4_smelt' | 'm5_gears' | 'm6_rich';
@@ -127,7 +137,7 @@ export interface MissionDef {
   rewardCredits: number;
   /** Unlocks granted for free on completion. */
   grants: UnlockId[];
-  conceptId?: string;
+  conceptId?: ConceptId;
 }
 
 export interface Stats {
@@ -146,7 +156,14 @@ export interface GameState {
   robots: Robot[];
   unlocks: UnlockId[];
   completedMissions: MissionId[];
+  /**
+   * Concept ids already shown to the player. Deliberately loose strings: a save
+   * from an older build may name a concept this one no longer has, and that is
+   * not a reason to reject the save.
+   */
   seenConcepts: string[];
+  /** How far the opening tutorial got. `ONBOARDING_DONE` means it is over. */
+  onboardingStep: number;
   stats: Stats;
   script: string;
   /** Milliseconds per tick. Lowered by upgrades, never by a speed slider. */

@@ -3,6 +3,7 @@ import {
   DEFAULT_CAPACITY,
   DEFAULT_REGROW_TICKS,
   DEFAULT_TICK_RATE_MS,
+  ONBOARDING_DONE,
   SAVE_VERSION,
   STARTER_SCRIPT,
   STARTING_UNLOCKS,
@@ -93,6 +94,7 @@ export function deserialize(raw: string | null): LoadResult {
 
   const state = data;
   state.version = SAVE_VERSION;
+  fillGaps(state);
 
   return originalVersion === SAVE_VERSION
     ? { ok: true, state }
@@ -118,6 +120,22 @@ export function clearSave(): void {
 }
 
 // Validation ----------------------------------------------------------------
+
+/**
+ * Fields added to the state after a save was already written.
+ *
+ * They are filled in here rather than demanded by `isGameState`, because a field
+ * with an obvious default is not worth throwing a factory away over. The
+ * tutorial step in particular defaults to *finished*: a save that predates
+ * onboarding belongs to someone who has plainly already pressed Run once, and
+ * sending them back to step one would be the game forgetting, not helping.
+ */
+function fillGaps(state: Record<string, unknown> & GameState): void {
+  const step = state['onboardingStep'];
+  if (typeof step !== 'number' || !Number.isFinite(step)) {
+    state.onboardingStep = ONBOARDING_DONE;
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

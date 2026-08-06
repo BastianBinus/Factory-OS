@@ -1,9 +1,10 @@
 import './style/index';
 import './boot.css';
 import { initTheme, onThemeChange } from './ui/ThemeToggle';
-import { primaryRobot, resetWorld } from './game/GameState';
+import { ONBOARDING_DONE, primaryRobot, resetWorld } from './game/GameState';
 import type { UnlockId } from './game/types';
 import { buyUnlock, evaluateMissions, getUnlock, unlockedCommands } from './game/progression';
+import { markConceptSeen, unseenConcepts } from './game/concepts';
 import { loadOrCreate, saveGame } from './game/saveLoad';
 import { advanceWorld } from './engine/commands';
 import { runCommand } from './engine/dispatch';
@@ -19,9 +20,12 @@ import { WorldView } from './render/WorldView';
 import type { HoverInfo } from './render/WorldView';
 import { CameraControls } from './render/CameraControls';
 import { CodePanel } from './ui/CodePanel';
+import { ConceptPanel } from './ui/ConceptPanel';
 import { Controls } from './ui/Controls';
+import { GuideBar } from './ui/GuideBar';
 import { Hud } from './ui/Hud';
 import { MissionPanel } from './ui/MissionPanel';
+import { Onboarding } from './ui/Onboarding';
 import { ShopPanel } from './ui/ShopPanel';
 import { Toasts } from './ui/Toast';
 
@@ -38,6 +42,7 @@ if (!app) throw new Error('#app container is missing from index.html');
 app.className = 'app';
 app.innerHTML = `
   <div class="viewport" id="viewport"></div>
+  <div class="topstack" id="topstack"></div>
   <div class="tiletip" id="tiletip" hidden></div>
 `;
 
@@ -49,6 +54,7 @@ function required<T extends HTMLElement>(selector: string): T {
 }
 
 const viewport = required<HTMLDivElement>('#viewport');
+const topStack = required('#topstack');
 const tooltip = required('#tiletip');
 
 // A save that cannot be read must never block the game: loadOrCreate always
@@ -201,7 +207,7 @@ function tick(): void {
   advanceWorld(state);
   settleProgress();
   worldView.sync(state);
-  hud.update(state);
+  paintStatus();
   renderPanels();
   scheduleSave();
 
@@ -212,8 +218,10 @@ function tick(): void {
 
 // Shell ------------------------------------------------------------------------
 
-const hud = new Hud({ parent: app });
+const hud = new Hud({ parent: topStack });
+const guide = new GuideBar({ parent: topStack, onOpen: () => missions.setOpen(true) });
 const toasts = new Toasts({ parent: app });
+const conceptPanel = new ConceptPanel({ parent: app });
 
 const codePanel = new CodePanel({
   parent: app,
@@ -221,6 +229,7 @@ const codePanel = new CodePanel({
   commands: unlockedCommands(state),
   onChange: (doc) => {
     state.script = doc;
+    checkOnboarding();
     scheduleSave();
   },
   onRun: () => runScript(),
@@ -237,6 +246,8 @@ const shop = new ShopPanel({
 const missions = new MissionPanel({
   parent: app,
   onToggle: (open) => onPanelToggle('missions', open),
+  // A re-read is not an announcement, so it opens without the "new" label.
+  onOpenConcept: (concept) => conceptPanel.show(concept, false),
 });
 
 /**
@@ -250,6 +261,7 @@ function onPanelToggle(source: 'code' | 'shop' | 'missions', open: boolean): voi
     if (source !== 'shop') shop.setOpen(false);
     if (source !== 'missions') missions.setOpen(false);
     renderPanels();
+    if (source === 'code') checkOnboarding();
   }
   // Read from the DOM rather than the panels: this also runs while they are
   // still being constructed, and it cannot fall out of sync with them.
@@ -260,6 +272,49 @@ function onPanelToggle(source: 'code' | 'shop' | 'missions', open: boolean): voi
 function renderPanels(): void {
   if (shop.isOpen) shop.render(state);
   if (missions.isOpen) missions.render(state);
+}
+
+/** The two readouts that answer "how am I doing" — kept in step, always. */
+function paintStatus(): void {
+  hud.update(state);
+  guide.update(state);
+}
+
+// Guidance ---------------------------------------------------------------------
+
+const onboarding = new Onboarding({
+  parent: app,
+  step: state.onboardingStep,
+  onChange: (step) => {
+    state.onboardingStep = step;
+    // Getting through the tutorial and then being asked to do it again after a
+    // reload would be the single most annoying bug this file could have.
+    saveNow();
+    paintStatus();
+    if (step >= ONBOARDING_DONE) showNewConcepts();
+  },
+});
+
+/** Whether the player has ever pressed Run — the last thing the tutorial waits for. */
+let ranScript = false;
+
+function checkOnboarding(): void {
+  onboarding.check({ editorOpen: codePanel.isOpen, script: state.script, ranScript });
+}
+
+/**
+ * Opens the panel for every concept the player has reached but never had
+ * explained. Held back until the tutorial is over, because the tutorial owns the
+ * first one — `await` is reached from the very first tick, and a modal on top of
+ * a step-one instruction would be two teachers talking at once.
+ */
+function showNewConcepts(): void {
+  if (!onboarding.done) return;
+
+  for (const concept of unseenConcepts(state)) {
+    markConceptSeen(state, concept.id);
+    conceptPanel.show(concept);
+  }
 }
 
 const controls = new Controls({
@@ -292,7 +347,7 @@ function resetFloor(note: string): void {
   resetWorld(state);
   worldView.sync(state);
   worldView.snapRobots();
-  hud.update(state);
+  paintStatus();
   renderPanels();
   scheduleSave();
   codePanel.console.system(note);
@@ -372,8 +427,9 @@ function applyProgress(): void {
     worldView.snapRobots();
   }
 
-  hud.update(state);
+  paintStatus();
   renderPanels();
+  showNewConcepts();
   saveNow();
 }
 
@@ -410,6 +466,9 @@ function runScript(): void {
   scheduler.setTickRate(state.tickRateMs);
   scheduler.start();
   controls.update({ running: true, paused: false });
+
+  ranScript = true;
+  checkOnboarding();
 }
 
 function stopScript(): void {
@@ -466,8 +525,12 @@ document.addEventListener('keydown', (event) => {
   }
 
   if (event.key === 'Escape' && !typing) {
-    // With a drawer open, Escape is a request to close it — stopping the script
-    // as well would end a run the player never asked to end.
+    // Innermost first: the modal, then a drawer, and only with nothing in the
+    // way does Escape mean stop. Anything else ends a run nobody asked to end.
+    if (conceptPanel.isOpen) {
+      conceptPanel.close();
+      return;
+    }
     if (shop.isOpen || missions.isOpen) {
       shop.setOpen(false);
       missions.setOpen(false);
@@ -491,10 +554,17 @@ onThemeChange(() => {
   worldView.applyPalette(next);
 });
 
-hud.update(state);
+paintStatus();
 controls.update({ running: false, paused: false });
 codePanel.console.system('Press E for the editor, then Ctrl+Enter to run.');
 reportLoad();
+
+// A returning player may have earned a concept in a build that did not have
+// concepts yet. Those are marked without a modal — nobody wants to be lectured
+// by a page they just loaded; the mission log has them if they want them.
+if (onboarding.done) {
+  for (const concept of unseenConcepts(state)) markConceptSeen(state, concept.id);
+}
 
 /** Says what happened to the previous save, but only when there is news. */
 function reportLoad(): void {

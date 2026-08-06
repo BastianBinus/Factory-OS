@@ -32,7 +32,8 @@ export class Hud {
 
   constructor(options: HudOptions) {
     this.element = document.createElement('div');
-    this.element.className = 'hud hud--top';
+    // Position comes from the `.topstack` it is placed in, not from the bar.
+    this.element.className = 'hud';
 
     const creditsLabel = document.createElement('span');
     creditsLabel.className = 't-label';

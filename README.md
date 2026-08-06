@@ -9,7 +9,7 @@ arrays, objects, `async`/`await` — explained in a short panel with a runnable 
 
 ## Status
 
-**Phase 5 of 8 — it is a game now.** Press `E` for the editor, write
+**Phase 6 of 8 — it teaches now.** Press `E` for the editor, write
 `while (true) { await move('north'); await mine(); }` and hit `Ctrl+Enter`. The line the robot is
 executing lights up in tick rhythm, the HUD shows credits and cargo, and the console under the
 editor carries `print()` output and errors with a clickable line number. Errors are translated:
@@ -20,6 +20,13 @@ Selling pays. `Missions` shows the chain you are working through and `Shop` turn
 commands, a faster clock, a bigger robot and more factory floor — a bought command autocompletes in
 the editor immediately. The game saves itself, so a reload puts you back where you were.
 `Esc` closes a panel or stops the script, `Reset` puts the floor back without touching what you earned.
+
+A new player is not dropped into an empty editor. A three-step tutorial waits by the bottom-left
+corner — open the editor, write a line, run it — and each step waits for the thing itself to happen
+rather than for a Next button. From there a `Now` line under the HUD always names the current
+mission, how far along it is and which command it pays out, and every unlock that carries a new
+language concept opens a short panel explaining it once. The panels stay readable afterwards under
+`Missions`.
 
 ## Getting started
 
@@ -50,7 +57,7 @@ phase has been done by hand.
 ```
 src/
   game/        the rules: types, GameState, grid, resources, recipes,
-               economy, progression, saveLoad — plain data, no DOM
+               economy, progression, concepts, saveLoad — plain data, no DOM
   engine/      the clock and the bridge to the worker: TickScheduler, ActionQueue,
                ScriptRunner (worker lifecycle + watchdog), commands, dispatch,
                lineMapper (stack trace to author line), errorHints (raw error
@@ -61,8 +68,8 @@ src/
                (procedural geometry), WorldView (state to scene), CameraControls
   style/       tokens.css is the single source of truth for the visual language
   ui/          DOM components: Hud, Controls, Editor, CodePanel, ConsolePanel,
-               Drawer (shared overlay chrome), ShopPanel, MissionPanel, Toast,
-               ThemeToggle
+               Drawer (shared overlay chrome), ShopPanel, MissionPanel,
+               ConceptPanel, Onboarding, GuideBar, Toast, ThemeToggle
   utils/       EventBus, safe localStorage helpers
   main.ts      app entry
   styleguide.ts  living styleguide page
@@ -105,6 +112,14 @@ themes recolours the factory without a second colour table.
 - **Progression is a data table, not code.** `progression.ts` holds every unlock and mission as a
   row; `applyUnlockEffect` is the single place that knows what a row does to the world. Adding an
   upgrade is a new row, and the shop renders it without being told.
+- **A concept is tied to a moment, not to a lesson.** The unlock or mission that first makes a
+  concept useful carries its id, so the explanation arrives when the player already wants it.
+  Onboarding owns the first one, which is why nothing else may open a panel until the tutorial is
+  finished — two teachers talking at once teaches neither.
+- **A save is never thrown away over a field that has an obvious default.** `onboardingStep` was
+  added after saves existed in the wild, so it is filled in after validation rather than demanded by
+  it, and it defaults to *finished*: a save that predates the tutorial belongs to someone who has
+  plainly already pressed Run.
 - **The save writes itself, but not on every tick.** Routine changes are written 1 s after they
   stop arriving, while an unlock or a completed mission is written immediately — progress you paid
   for should not depend on a timer. A save that cannot be read starts a new factory and says so,
@@ -124,6 +139,6 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 3 | Editor, worker sandbox, tick engine | done |
 | 4 | HUD, console, error experience, active-line highlight | done |
 | 5 | Economy, shop, tech tree, missions | done |
-| 6 | Guided learning panels, onboarding | next |
-| 7 | Polish and deploy to Vercel |  |
+| 6 | Guided learning panels, onboarding | done |
+| 7 | Polish and deploy to Vercel | next |
 | 8 | Supabase: auth, cloud saves, edge functions |  |

@@ -239,21 +239,48 @@ function render(): void {
       )}
 
       ${section(
+        'Guidance',
+        `<div class="sg__demo sg__stack">
+          <button class="guide" type="button">
+            <span class="t-label">Now</span>
+            <span class="guide__title">Dig in</span>
+            <span class="guide__text">Mine 15 units of ore and sell them at the market in the north-west corner.</span>
+            <span class="progress guide__progress"><i class="progress__fill" style="width: 60%"></i></span>
+            <span class="guide__count">9 / 15</span>
+            <span class="guide__reward">Unlocks wait()</span>
+          </button>
+          <aside class="coach" style="position: static; width: 320px">
+            <div class="coach__head">
+              <span class="t-label">Step 2 of 3</span>
+              <button class="btn btn--ghost btn--sm">Skip</button>
+            </div>
+            <h2 class="t-title">Write your first command</h2>
+            <p class="t-body t-muted">Uncomment the loop, or type <code>await move('south');</code> on a line of its own. The await is not decoration: without it the line does not wait for the robot.</p>
+          </aside>
+          <ul class="conceptlist" style="max-width: 360px">
+            <li><button class="conceptlink"><span class="conceptlink__no">1</span><span>await — waiting for the robot</span></button></li>
+            <li><button class="conceptlink"><span class="conceptlink__no">2</span><span>while — repeating without repeating yourself</span></button></li>
+          </ul>
+        </div>`,
+        'The guide line is the smallest honest answer to "what now": the mission, how far along, and what it pays. The coach card only appears for the first three steps and every step waits for the player to actually do the thing — there is no Next button, because a tutorial you can click through teaches the clicking.',
+      )}
+
+      ${section(
         'Concept panel & toast',
         `<div class="sg__demo sg__row" style="align-items: flex-start">
           <div class="panel concept">
             <div class="panel__head">
               <span class="t-label">New concept</span>
-              <span class="t-label">2 of 9</span>
+              <span class="t-label">2 of 7</span>
             </div>
-            <div class="panel__body sg__stack">
-              <h3 class="t-display">The while loop</h3>
-              <p class="t-prose">A loop repeats a block of code for as long as its condition stays true. <code>while (true)</code> never stops on its own — which is exactly what you want for a robot that should keep working.</p>
+            <div class="panel__body concept__body">
+              <h2 class="t-display">while — repeating without repeating yourself</h2>
+              <p class="t-prose">A while loop runs the block between its braces again and again, for as long as the condition in the parentheses stays true. while (true) never becomes false, so it keeps going until you press Stop — which is exactly what a factory robot should do.</p>
               <pre class="concept__code">while (true) {
-  await move('north');
+  await move('south');
   await mine();
 }</pre>
-              <div class="sg__row"><button class="btn btn--primary">Got it</button></div>
+              <div class="concept__actions"><button class="btn btn--primary">Got it</button></div>
             </div>
           </div>
           <div class="toast">
@@ -261,6 +288,7 @@ function render(): void {
             <span class="t-body"><code>scan()</code> is now available in the editor.</span>
           </div>
         </div>`,
+        'The one modal in the game, and the only thing allowed to dim the factory. It appears once per concept, then lives in the mission log where it can be re-read without the interruption.',
       )}
     </div>
   `;

@@ -10,13 +10,29 @@ export const DEFAULT_REGROW_TICKS = 30;
 
 export const STARTING_UNLOCKS: UnlockId[] = ['move', 'mine', 'print'];
 
-export const STARTER_SCRIPT = `// Every command that takes time returns a promise,
-// so it needs 'await' in front of it.
+/** Steps of the opening tutorial; anything at or above this means it is over. */
+export const ONBOARDING_DONE = 3;
 
-while (true) {
-  await move('south');
-  await move('east');
-}
+/**
+ * The script a new player finds. It is entirely commented out on purpose: the
+ * tutorial asks them to write the first live line themselves, and a starter
+ * script that already runs would take that away — and make the second tutorial
+ * step complete itself before they had typed anything.
+ */
+export const STARTER_SCRIPT = `// This is your script. It drives the robot in the factory
+// behind this panel, and it runs from top to bottom.
+//
+// Every command that makes the robot do something takes time.
+// It hands back a promise instead of a result, so you write
+// 'await' in front of it to wait for the robot to finish.
+//
+// Remove the // in front of the four lines below, then press
+// Ctrl+Enter to run it.
+
+// while (true) {
+//   await move('south');
+//   await mine();
+// }
 `;
 
 /**
@@ -90,6 +106,7 @@ export function createInitialState(): GameState {
     unlocks: [...STARTING_UNLOCKS],
     completedMissions: [],
     seenConcepts: [],
+    onboardingStep: 0,
     stats: { tilesMoved: 0, oreMined: 0, creditsEarned: 0, itemsSold: 0, crafted: {} },
     script: STARTER_SCRIPT,
     tickRateMs: DEFAULT_TICK_RATE_MS,

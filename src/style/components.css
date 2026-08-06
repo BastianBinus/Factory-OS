@@ -418,6 +418,17 @@
   width: 100%;
 }
 
+.concept__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.concept__body h2,
+.concept__body p {
+  margin: 0;
+}
+
 .concept__code {
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
@@ -427,6 +438,54 @@
   font-size: 13px;
   line-height: 1.6;
   overflow-x: auto;
+}
+
+.concept__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* The same concepts, re-readable, in the mission drawer. */
+.conceptlist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conceptlist li[hidden] {
+  display: none;
+}
+
+.conceptlink {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 6px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.conceptlink:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.conceptlink__no {
+  flex: none;
+  width: 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
 }
 
 /* Toast ------------------------------------------------------------------ */

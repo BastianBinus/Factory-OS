@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SAVE_VERSION, createInitialState, hasUnlock } from '../src/game/GameState';
+import { ONBOARDING_DONE, SAVE_VERSION, createInitialState, hasUnlock } from '../src/game/GameState';
 import { deserialize, serialize } from '../src/game/saveLoad';
 import { buyUnlock, evaluateMissions, unlockedCommands } from '../src/game/progression';
 
@@ -159,5 +159,47 @@ describe('migration', () => {
     if (!result.ok) return;
     expect(result.state.credits).toBe(777);
     expect(result.state.inventoryCapacity).toBe(20);
+  });
+});
+
+describe('the tutorial step', () => {
+  it('survives a reload half-finished', () => {
+    const state = createInitialState();
+    state.onboardingStep = 2;
+
+    const result = deserialize(serialize(state));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.onboardingStep).toBe(2);
+  });
+
+  /*
+   * The important one. A save written before onboarding existed belongs to
+   * someone who has obviously already pressed Run, and it is still a perfectly
+   * good save — neither rejecting it nor restarting their tutorial is acceptable.
+   */
+  it('counts as finished in a save written before the tutorial existed', () => {
+    const data = savedState();
+    data['credits'] = 4000;
+    delete data['onboardingStep'];
+
+    const result = deserialize(JSON.stringify(data));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.onboardingStep).toBe(ONBOARDING_DONE);
+    expect(result.state.credits).toBe(4000);
+  });
+
+  it('counts as finished when the saved value is nonsense', () => {
+    const data = savedState();
+    data['onboardingStep'] = 'nearly';
+
+    const result = deserialize(JSON.stringify(data));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.onboardingStep).toBe(ONBOARDING_DONE);
   });
 });

@@ -230,12 +230,15 @@ function render(): void {
       ${section(
         'Console',
         `<div class="sg__console console">
-          <div class="console__line">mined iron_ore at 3,5</div>
-          <div class="console__line console__line--system">tick 41 · moved north</div>
-          <div class="console__line console__line--success">sold 4 iron_ingot for 44 cr</div>
-          <div class="console__line console__line--error">Command 'mine' was called while 'move' was still running. Did you forget 'await' on <button class="console__ref">line 4</button>?</div>
+          <div class="console__line console__line--print">iron_ore: 7</div>
+          <div class="console__line console__line--system">Unlocked sell() — try it from the market tile.</div>
+          <div class="console__line console__line--error">
+            <span class="console__text">mine is not defined</span>
+            <button class="console__jump" type="button">line 4</button>
+          </div>
+          <div class="console__line console__line--error console__line--detail">mine() is not unlocked yet. Finish the mission that grants it, or buy it in the Shop.</div>
         </div>`,
-        'Errors are rewritten into something a beginner can act on. The raw JavaScript message is kept underneath, never shown first.',
+        'Three kinds of line, each with a coloured bar so they separate without being read: what the script printed, what the game says, what went wrong. An error carries the line it happened on as a button that jumps the editor there, and the advice goes underneath in a quieter voice — never instead of the message.',
       )}
 
       ${section(

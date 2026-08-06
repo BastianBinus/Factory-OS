@@ -21,6 +21,7 @@ const MAX_LINES = 400;
 export class ConsolePanel {
   readonly element: HTMLElement;
   private readonly list: HTMLElement;
+  private readonly empty: HTMLElement;
   private onLineClick: ((line: number) => void) | null = null;
 
   constructor() {
@@ -41,7 +42,13 @@ export class ConsolePanel {
     this.list = document.createElement('div');
     this.list.className = 'console__lines';
 
-    this.element.append(head, this.list);
+    // Lives outside the list so the MAX_LINES trim cannot count it or drop it.
+    // An empty console is not broken, but saying nothing looks like it is.
+    this.empty = document.createElement('p');
+    this.empty.className = 'console__empty t-body t-muted';
+    this.empty.textContent = 'Nothing printed yet. print() writes here, and so does every error.';
+
+    this.element.append(head, this.empty, this.list);
   }
 
   onLine(handler: (line: number) => void): void {
@@ -67,6 +74,7 @@ export class ConsolePanel {
     }
 
     this.list.appendChild(row);
+    this.empty.hidden = true;
 
     if (entry.detail) {
       const note = document.createElement('div');
@@ -95,5 +103,6 @@ export class ConsolePanel {
 
   clear(): void {
     this.list.replaceChildren();
+    this.empty.hidden = false;
   }
 }

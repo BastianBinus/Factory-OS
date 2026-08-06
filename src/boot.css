@@ -482,6 +482,16 @@
   line-height: 1.6;
 }
 
+/* Sits where the first line will be, so the console does not jump when it fills. */
+.console__empty {
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-2);
+}
+
+.console__empty[hidden] {
+  display: none;
+}
+
 .console__line {
   display: flex;
   align-items: baseline;

@@ -9,12 +9,17 @@ arrays, objects, `async`/`await` — explained in a short panel with a runnable 
 
 ## Status
 
-**Phase 4 of 8 — you can see what your code is doing.** Press `E` for the editor, write
+**Phase 5 of 8 — it is a game now.** Press `E` for the editor, write
 `while (true) { await move('north'); await mine(); }` and hit `Ctrl+Enter`. The line the robot is
 executing lights up in tick rhythm, the HUD shows credits and cargo, and the console under the
 editor carries `print()` output and errors with a clickable line number. Errors are translated:
 a forgotten `await` and a command you have not unlocked both explain themselves instead of
-throwing raw JavaScript at you. `Esc` stops, `Reset` puts the floor back.
+throwing raw JavaScript at you.
+
+Selling pays. `Missions` shows the chain you are working through and `Shop` turns credits into new
+commands, a faster clock, a bigger robot and more factory floor — a bought command autocompletes in
+the editor immediately. The game saves itself, so a reload puts you back where you were.
+`Esc` closes a panel or stops the script, `Reset` puts the floor back without touching what you earned.
 
 ## Getting started
 
@@ -56,7 +61,8 @@ src/
                (procedural geometry), WorldView (state to scene), CameraControls
   style/       tokens.css is the single source of truth for the visual language
   ui/          DOM components: Hud, Controls, Editor, CodePanel, ConsolePanel,
-               Toast, ThemeToggle
+               Drawer (shared overlay chrome), ShopPanel, MissionPanel, Toast,
+               ThemeToggle
   utils/       EventBus, safe localStorage helpers
   main.ts      app entry
   styleguide.ts  living styleguide page
@@ -96,6 +102,13 @@ themes recolours the factory without a second colour table.
   costs a learner more than a terse correct one.
 - **`GameState` is plain JSON.** That is what makes the save file the state verbatim, the whole
   rule set testable without a browser, and a cloud save in phase 8 a single column.
+- **Progression is a data table, not code.** `progression.ts` holds every unlock and mission as a
+  row; `applyUnlockEffect` is the single place that knows what a row does to the world. Adding an
+  upgrade is a new row, and the shop renders it without being told.
+- **The save writes itself, but not on every tick.** Routine changes are written 1 s after they
+  stop arriving, while an unlock or a completed mission is written immediately — progress you paid
+  for should not depend on a timer. A save that cannot be read starts a new factory and says so,
+  rather than refusing to boot.
 
 ## Tech
 
@@ -110,7 +123,7 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 2 | 3D world: scene, procedural meshes, camera | done |
 | 3 | Editor, worker sandbox, tick engine | done |
 | 4 | HUD, console, error experience, active-line highlight | done |
-| 5 | Economy, shop, tech tree, missions | next |
-| 6 | Guided learning panels, onboarding |  |
+| 5 | Economy, shop, tech tree, missions | done |
+| 6 | Guided learning panels, onboarding | next |
 | 7 | Polish and deploy to Vercel |  |
 | 8 | Supabase: auth, cloud saves, edge functions |  |

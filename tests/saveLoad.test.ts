@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { SAVE_VERSION, createInitialState } from '../src/game/GameState';
+import { SAVE_VERSION, createInitialState, hasUnlock } from '../src/game/GameState';
 import { deserialize, serialize } from '../src/game/saveLoad';
+import { buyUnlock, evaluateMissions, unlockedCommands } from '../src/game/progression';
 
 function savedState(): Record<string, unknown> {
   return JSON.parse(serialize(createInitialState())) as Record<string, unknown>;
@@ -28,6 +29,66 @@ describe('round trip', () => {
     const state = createInitialState();
     state.version = 0;
     expect(JSON.parse(serialize(state)).version).toBe(SAVE_VERSION);
+  });
+});
+
+describe('a played state survives a reload', () => {
+  /** Plays far enough that every kind of earned progress is present at once. */
+  function playedState() {
+    const state = createInitialState();
+    state.stats.tilesMoved = 20;
+    state.stats.oreMined = 15;
+    evaluateMissions(state); // m1 and m2: rewards, and sell() plus wait() granted
+
+    state.credits = 10_000;
+    buyUnlock(state, 'scan'); // a command
+    buyUnlock(state, 'grid_12'); // a bigger world
+    buyUnlock(state, 'tick_300'); // a faster clock
+    buyUnlock(state, 'capacity_20'); // a bigger robot
+    state.script = 'while (true) {\n  await move("north");\n}';
+
+    return state;
+  }
+
+  it('brings back credits, unlocks, grid, script and mission state', () => {
+    const state = playedState();
+    const result = deserialize(serialize(state));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const loaded = result.state;
+
+    expect(loaded.credits).toBe(state.credits);
+    expect(loaded.completedMissions).toEqual(['m1_move', 'm2_mine']);
+    expect(loaded.script).toBe(state.script);
+    expect(loaded.grid.width).toBe(12);
+    expect(loaded.grid.tiles).toHaveLength(144);
+    expect(loaded.tickRateMs).toBe(300);
+    expect(loaded.inventoryCapacity).toBe(20);
+    expect(loaded.stats).toEqual(state.stats);
+  });
+
+  it('leaves the reloaded script able to call everything it could before', () => {
+    const loaded = deserialize(serialize(playedState()));
+
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+
+    // The worker builds its API from this list, so a name lost here is a script
+    // that stops working purely because the player pressed reload.
+    expect(unlockedCommands(loaded.state)).toEqual(unlockedCommands(playedState()));
+    expect(hasUnlock(loaded.state, 'scan')).toBe(true);
+  });
+
+  it('does not hand out a mission reward a second time after loading', () => {
+    const loaded = deserialize(serialize(playedState()));
+
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+
+    const before = loaded.state.credits;
+    expect(evaluateMissions(loaded.state)).toHaveLength(0);
+    expect(loaded.state.credits).toBe(before);
   });
 });
 

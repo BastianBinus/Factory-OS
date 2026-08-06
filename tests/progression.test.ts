@@ -12,6 +12,7 @@ import {
   missionProgress,
   purchaseBlocker,
   unlockedCommands,
+  visibleUnlocks,
 } from '../src/game/progression';
 
 describe('tables', () => {
@@ -137,6 +138,28 @@ describe('shop', () => {
     expect(state.credits).toBe(140);
     expect(unlockedCommands(state)).toContain('sell');
     expect(isPurchasable(state, 'sell')).toBe(false);
+  });
+
+  it('hides the free starting commands but keeps everything with a price', () => {
+    const listed = visibleUnlocks(createInitialState()).map((unlock) => unlock.id);
+
+    // move/mine/print are owned and cost nothing, so a card for them would be a
+    // row the player can never act on.
+    expect(listed).not.toContain('move');
+    expect(listed).not.toContain('mine');
+    expect(listed).not.toContain('print');
+
+    // A locked node stays on the shelf: seeing what comes next is the point.
+    expect(listed).toContain('scan');
+    expect(listed).toContain('robot_2');
+  });
+
+  it('keeps a paid unlock on the shelf after it is bought', () => {
+    const state = createInitialState();
+    state.credits = 500;
+    buyUnlock(state, 'sell');
+
+    expect(visibleUnlocks(state).map((unlock) => unlock.id)).toContain('sell');
   });
 
   it('rejects an unknown upgrade', () => {

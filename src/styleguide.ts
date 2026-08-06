@@ -180,20 +180,51 @@ function render(): void {
           <div class="card card--affordable">
             <div class="card__head"><span class="t-title">scan()</span><span class="card__price">120 cr</span></div>
             <p class="t-body t-muted">Read what is on the tile the robot stands on.</p>
+            <div class="card__actions"><code class="card__grants">scan()</code><span class="card__spacer"></span><button class="btn btn--sm">Buy</button></div>
           </div>
           <div class="card">
-            <div class="card__head"><span class="t-title">craft()</span><span class="card__price">400 cr</span></div>
-            <p class="t-body t-muted">Start the machine on the current tile.</p>
+            <div class="card__head"><span class="t-title">craft() and take()</span><span class="card__price">180 cr</span></div>
+            <p class="t-body t-muted">Start the machine below the robot, and collect what it produced.</p>
+            <div class="card__actions"><code class="card__grants">craft() take()</code><span class="card__spacer"></span><button class="btn btn--sm" disabled>Buy</button></div>
           </div>
           <div class="card card--owned">
-            <div class="card__head"><span class="t-title">mine()</span><span class="card__check">Owned</span></div>
-            <p class="t-body t-muted">Extract ore from the current tile.</p>
+            <div class="card__head"><span class="t-title">sell()</span><span class="card__check">Owned</span></div>
+            <p class="t-body t-muted">Sell everything the robot carries.</p>
+            <div class="card__actions"><code class="card__grants">sell()</code></div>
           </div>
           <div class="card card--locked">
-            <div class="card__head"><span class="t-title">Second robot</span><span class="card__price">2 000 cr</span></div>
-            <p class="t-body">Requires mission 6.</p>
+            <div class="card__head"><span class="t-title">Second robot</span><span class="card__price">5 000 cr</span></div>
+            <p class="t-body t-muted">A second robot rolls off the ramp.</p>
+            <p class="card__note">Locked until the mission "Industrialist" is done.</p>
+            <div class="card__actions"><span class="card__spacer"></span><button class="btn btn--sm" disabled>Buy</button></div>
           </div>
         </div>`,
+        'A card only says out loud what the price tag cannot. "Too expensive" gets no sentence — the price and the balance in the drawer header already carry that.',
+      )}
+
+      ${section(
+        'Missions',
+        `<div class="sg__demo sg__stack">
+          <div class="mission mission--done">
+            <div class="mission__head"><span class="t-title">First steps</span><span class="mission__status">Done</span></div>
+            <p class="t-body t-muted">Drive the robot across 20 tiles.</p>
+            <div class="progress"><i class="progress__fill" style="width: 100%"></i></div>
+            <p class="mission__reward">Reward: 40 cr · sell()</p>
+          </div>
+          <div class="mission mission--active">
+            <div class="mission__head"><span class="t-title">Dig in</span><span class="mission__status">9 / 15</span></div>
+            <p class="t-body t-muted">Mine 15 units of ore and sell them at the market.</p>
+            <div class="progress"><i class="progress__fill" style="width: 60%"></i></div>
+            <p class="mission__reward">Reward: 60 cr · wait()</p>
+          </div>
+          <div class="mission">
+            <div class="mission__head"><span class="t-title">Turning a profit</span><span class="mission__status">0 / 200</span></div>
+            <p class="t-body t-muted">Earn 200 credits in total.</p>
+            <div class="progress"><i class="progress__fill" style="width: 0%"></i></div>
+            <p class="mission__reward">Reward: 100 cr</p>
+          </div>
+        </div>`,
+        'Only the mission being worked on carries the accent bar. The whole chain stays visible, including missions far ahead — seeing that gears come after ingots is what makes the next command worth buying.',
       )}
 
       ${section(

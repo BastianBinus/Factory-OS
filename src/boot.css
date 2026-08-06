@@ -48,8 +48,8 @@
   transition: left var(--t-base) var(--ease);
 }
 
-/* With the editor open the factory lives in the left half; the bars follow it. */
-.app--code-open .bar--bottom {
+/* With a panel open the factory lives in the left half; the bars follow it. */
+.app--panel-open .bar--bottom {
   left: calc(50% - var(--panel-w) / 2);
 }
 
@@ -78,7 +78,7 @@
   transition: right var(--t-base) var(--ease);
 }
 
-.app--code-open .hud--top {
+.app--panel-open .hud--top {
   right: calc(var(--panel-w) + var(--sp-3));
 }
 
@@ -223,6 +223,76 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* Shop and mission drawers -------------------------------------------------- */
+
+/*
+ * Same slot and same width as the code overlay. Only one of the three is ever
+ * open, so they can share the geometry without ever stacking.
+ */
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: var(--panel-w);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-radius: 14px 0 0 14px;
+  box-shadow: var(--sh-3);
+  transform: translateX(101%);
+  transition: transform var(--t-base) var(--ease);
+}
+
+.drawer--open {
+  transform: translateX(0);
+}
+
+.drawer__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer__note {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.drawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-4);
+}
+
+.drawer__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--sp-3);
+}
+
+.drawer__grid .card[hidden] {
+  display: none;
+}
+
+.drawer__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: mission;
 }
 
 /* Console ------------------------------------------------------------------ */

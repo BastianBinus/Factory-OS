@@ -1,0 +1,191 @@
+/**
+ * The whole game is described by GameState: a plain, JSON-serialisable object.
+ * Nothing in this folder may import the DOM, three.js or the worker — that is
+ * what makes the rules testable without a browser.
+ */
+
+export type Direction = 'north' | 'east' | 'south' | 'west';
+
+export type ResourceId = 'iron_ore' | 'copper_ore' | 'iron_ingot' | 'copper_ingot' | 'gear';
+
+export type MachineId = 'smelter' | 'assembler';
+
+/** Sparse on purpose: a missing key means zero. Use the helpers in resources.ts. */
+export type Inventory = Partial<Record<ResourceId, number>>;
+
+export interface FloorTile {
+  kind: 'floor';
+}
+
+export interface OreTile {
+  kind: 'ore';
+  resource: ResourceId;
+  /** Units left in this node. Zero means depleted and waiting to regrow. */
+  amount: number;
+  /** Tick at which a depleted node refills, or null while it still has ore. */
+  regrowAt: number | null;
+}
+
+export interface MachineJob {
+  recipeId: string;
+  readyAt: number;
+}
+
+export interface MachineTile {
+  kind: 'machine';
+  machine: MachineId;
+  input: Inventory;
+  output: Inventory;
+  job: MachineJob | null;
+}
+
+export interface MarketTile {
+  kind: 'market';
+}
+
+export type Tile = FloorTile | OreTile | MachineTile | MarketTile;
+
+export interface Robot {
+  id: string;
+  x: number;
+  y: number;
+  facing: Direction;
+  inventory: Inventory;
+}
+
+export interface Grid {
+  width: number;
+  height: number;
+  /** Row-major, length === width * height. */
+  tiles: Tile[];
+}
+
+export interface Recipe {
+  id: string;
+  machine: MachineId;
+  inputs: Inventory;
+  output: ResourceId;
+  outputAmount: number;
+  ticks: number;
+}
+
+export interface ResourceDef {
+  id: ResourceId;
+  label: string;
+  /** CSS custom property name (without --) used for the colour dot and the mesh. */
+  colorToken: string;
+  sellPrice: number;
+}
+
+export type UnlockId =
+  | 'move'
+  | 'mine'
+  | 'drop'
+  | 'sell'
+  | 'wait'
+  | 'print'
+  | 'scan'
+  | 'craft'
+  | 'scan_at'
+  | 'grid_12'
+  | 'grid_16'
+  | 'capacity_20'
+  | 'capacity_50'
+  | 'tick_300'
+  | 'tick_200'
+  | 'tick_120'
+  | 'robot_2';
+
+export type ConceptId = 'await' | 'while' | 'if_else' | 'functions' | 'arrays' | 'objects' | 'for_of';
+
+export interface ConceptDef {
+  id: ConceptId;
+  title: string;
+  /** Two to four sentences. Prose, not a reference entry. */
+  body: string;
+  codeExample: string;
+}
+
+export interface UnlockDef {
+  id: UnlockId;
+  label: string;
+  description: string;
+  cost: number;
+  /** Command names this unlock exposes to the player script, if any. */
+  commands?: string[];
+  /** Mission that must be completed before this can be bought. */
+  requiresMission?: MissionId;
+  /** Other unlocks that must be owned first. */
+  requiresUnlocks?: UnlockId[];
+  /** JS concept explained when this unlock becomes available. */
+  conceptId?: ConceptId;
+}
+
+export type MissionId = 'm1_move' | 'm2_mine' | 'm3_earn' | 'm4_smelt' | 'm5_gears' | 'm6_rich';
+
+export type MissionGoal =
+  | { type: 'move'; target: number }
+  | { type: 'mine'; target: number }
+  | { type: 'credits_earned'; target: number }
+  | { type: 'crafted'; resource: ResourceId; target: number };
+
+export interface MissionDef {
+  id: MissionId;
+  title: string;
+  summary: string;
+  goal: MissionGoal;
+  rewardCredits: number;
+  /** Unlocks granted for free on completion. */
+  grants: UnlockId[];
+  conceptId?: ConceptId;
+}
+
+export interface Stats {
+  tilesMoved: number;
+  oreMined: number;
+  creditsEarned: number;
+  itemsSold: number;
+  crafted: Inventory;
+}
+
+export interface GameState {
+  version: number;
+  tick: number;
+  credits: number;
+  grid: Grid;
+  robots: Robot[];
+  unlocks: UnlockId[];
+  completedMissions: MissionId[];
+  /**
+   * Concept ids already shown to the player. Deliberately loose strings: a save
+   * from an older build may name a concept this one no longer has, and that is
+   * not a reason to reject the save.
+   */
+  seenConcepts: string[];
+  /** How far the opening tutorial got. `ONBOARDING_DONE` means it is over. */
+  onboardingStep: number;
+  stats: Stats;
+  script: string;
+  /** Milliseconds per tick. Lowered by upgrades, never by a speed slider. */
+  tickRateMs: number;
+  inventoryCapacity: number;
+  oreRegrowTicks: number;
+}
+
+export type CommandErrorCode =
+  | 'blocked'
+  | 'nothing_here'
+  | 'inventory_full'
+  | 'inventory_empty'
+  | 'depleted'
+  | 'no_recipe'
+  | 'missing_input'
+  | 'busy'
+  | 'not_ready'
+  | 'out_of_bounds'
+  | 'bad_argument'
+  | 'no_robot';
+
+export type CommandResult =
+  | { ok: true; value: unknown; log?: string }
+  | { ok: false; code: CommandErrorCode; error: string };

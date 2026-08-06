@@ -1,0 +1,75 @@
+/**
+ * The only vocabulary the main thread and the sandbox worker share.
+ *
+ * The rule that shapes everything here: the worker never touches game state. It
+ * asks for an action and waits; the tick scheduler decides when that action
+ * happens and sends back the result plus a fresh snapshot of the values the
+ * player can read without spending a tick.
+ */
+
+/** What `position()`, `inventory()` and `credits()` answer from, between ticks. */
+export interface StateSnapshot {
+  x: number;
+  y: number;
+  facing: string;
+  inventory: Record<string, number>;
+  credits: number;
+  tick: number;
+}
+
+export interface RunMessage {
+  type: 'run';
+  source: string;
+  /** Names the player has unlocked. Everything else is absent from the API. */
+  commands: string[];
+  snapshot: StateSnapshot;
+}
+
+export interface ResolveMessage {
+  type: 'resolve';
+  id: number;
+  value: unknown;
+  snapshot: StateSnapshot;
+}
+
+export interface RejectMessage {
+  type: 'reject';
+  id: number;
+  message: string;
+  snapshot: StateSnapshot;
+}
+
+export type MainToWorker = RunMessage | ResolveMessage | RejectMessage;
+
+export interface ReadyMessage {
+  type: 'ready';
+  /** False when the stack format was unknown — line numbers stay off. */
+  lineNumbers: boolean;
+}
+
+export interface ActionMessage {
+  type: 'action';
+  id: number;
+  command: string;
+  args: unknown[];
+  line: number | null;
+}
+
+export interface LogMessage {
+  type: 'log';
+  text: string;
+  line: number | null;
+}
+
+export interface ErrorMessage {
+  type: 'error';
+  name: string;
+  message: string;
+  line: number | null;
+}
+
+export interface DoneMessage {
+  type: 'done';
+}
+
+export type WorkerToMain = ReadyMessage | ActionMessage | LogMessage | ErrorMessage | DoneMessage;

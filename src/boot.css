@@ -1,0 +1,542 @@
+/*
+ * Shell around the 3D viewport: the HUD, the control bar, the code overlay, the
+ * console and the toast stack. Everything here floats above the canvas, which
+ * fills the window on its own.
+ */
+
+.app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  /* The code overlay and the bars that step aside for it share one width. */
+  --panel-w: min(560px, 46vw);
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+}
+
+.viewport canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Floating bars ------------------------------------------------------------ */
+
+.bar {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--sh-2);
+}
+
+.bar--bottom {
+  bottom: var(--sp-3);
+  left: 50%;
+  transform: translateX(-50%);
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100vw - var(--sp-5) * 2);
+  transition: left var(--t-base) var(--ease);
+}
+
+/* With a panel open the factory lives in the left half; the bars follow it. */
+.app--panel-open .bar--bottom {
+  left: calc(50% - var(--panel-w) / 2);
+}
+
+.bar__sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 var(--sp-1);
+  background: var(--border);
+}
+
+.bar__note {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* HUD ---------------------------------------------------------------------- */
+
+/*
+ * The HUD and the guide line stack at the top edge. They share one container so
+ * the guide sits under the bar whatever height the bar happens to be, rather
+ * than being nudged down by a magic number that a font change would break.
+ */
+.topstack {
+  position: absolute;
+  z-index: 2;
+  top: var(--sp-3);
+  left: var(--sp-3);
+  right: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  transition: right var(--t-base) var(--ease);
+  /* Only the bars themselves take the mouse; the gaps belong to the factory. */
+  pointer-events: none;
+}
+
+.topstack > * {
+  pointer-events: auto;
+}
+
+.app--panel-open .topstack {
+  right: calc(var(--panel-w) + var(--sp-3));
+}
+
+/* Guide line --------------------------------------------------------------- */
+
+.guide {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 6px var(--sp-4) 6px var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--sh-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease);
+}
+
+.guide:hover {
+  border-color: var(--border-strong);
+  border-left-color: var(--accent);
+}
+
+.guide[hidden] {
+  display: none;
+}
+
+.guide__title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The one part allowed to lose its tail on a narrow window. */
+.guide__text {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide__progress {
+  flex: none;
+  width: 64px;
+}
+
+.guide__count,
+.guide__reward {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Onboarding coach --------------------------------------------------------- */
+
+/*
+ * Bottom left, clear of the control bar in the centre — the tutorial has to be
+ * able to point at Run without covering it.
+ */
+.coach {
+  position: absolute;
+  z-index: 3;
+  left: var(--sp-3);
+  bottom: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: min(320px, calc(100vw - var(--sp-5) * 2));
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--sh-2);
+}
+
+.coach[hidden] {
+  display: none;
+}
+
+.coach__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.coach h2,
+.coach p {
+  margin: 0;
+}
+
+/* Concept modal ------------------------------------------------------------ */
+
+/*
+ * The only thing in the game that dims the factory. A concept has earned the
+ * interruption; nothing else has.
+ */
+.modal {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-5);
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(3px);
+  animation: modal-in var(--t-base) var(--ease);
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hud__group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex: none;
+}
+
+.hud__cargo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hud__idle {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.hud__idle[hidden] {
+  display: none;
+}
+
+/* Toasts ------------------------------------------------------------------- */
+
+.toasts {
+  position: absolute;
+  z-index: 5;
+  right: var(--sp-3);
+  bottom: calc(var(--sp-3) + 56px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  pointer-events: none;
+}
+
+.toast {
+  animation: toast-in var(--t-base) var(--ease);
+  transition: opacity var(--t-base) var(--ease);
+}
+
+.toast--error {
+  border-left-color: var(--danger);
+}
+
+.toast--success {
+  border-left-color: var(--success);
+}
+
+.toast--leaving {
+  opacity: 0;
+}
+
+.toast__title {
+  font-weight: 600;
+}
+
+.toast__body {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Hover tooltip ------------------------------------------------------------ */
+
+.tiletip {
+  position: absolute;
+  z-index: 3;
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--sh-1);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.tiletip[hidden] {
+  display: none;
+}
+
+/* Code overlay ------------------------------------------------------------- */
+
+.codepanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: var(--panel-w);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-radius: 14px 0 0 14px;
+  box-shadow: var(--sh-3);
+  /* Off-screen but still laid out, so the editor knows its width before opening. */
+  transform: translateX(101%);
+  transition: transform var(--t-base) var(--ease);
+}
+
+.codepanel--open {
+  transform: translateX(0);
+}
+
+.codepanel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.codepanel__hint {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.codepanel__editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Shop and mission drawers -------------------------------------------------- */
+
+/*
+ * Same slot and same width as the code overlay. Only one of the three is ever
+ * open, so they can share the geometry without ever stacking.
+ */
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: var(--panel-w);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-radius: 14px 0 0 14px;
+  box-shadow: var(--sh-3);
+  transform: translateX(101%);
+  transition: transform var(--t-base) var(--ease);
+}
+
+.drawer--open {
+  transform: translateX(0);
+}
+
+.drawer__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer__note {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.drawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-4);
+}
+
+.drawer__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--sp-3);
+}
+
+.drawer__grid .card[hidden] {
+  display: none;
+}
+
+.drawer__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: mission;
+}
+
+.drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+.drawer__section[hidden] {
+  display: none;
+}
+
+/* Console ------------------------------------------------------------------ */
+
+.console {
+  display: flex;
+  flex-direction: column;
+  height: 200px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-sunk);
+  border-radius: 0 0 0 14px;
+}
+
+.console__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.console__lines {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--sp-3) var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* Sits where the first line will be, so the console does not jump when it fills. */
+.console__empty {
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-2);
+}
+
+.console__empty[hidden] {
+  display: none;
+}
+
+.console__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 2px 0 2px var(--sp-2);
+  border-left: 2px solid var(--border-strong);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.console__line--system {
+  border-left-color: var(--info);
+  color: var(--text-muted);
+}
+
+.console__line--error {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
+/* The follow-up line under a message: same bar, quieter voice. */
+.console__line--detail {
+  padding-top: 0;
+  padding-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.console__jump {
+  flex: none;
+  padding: 0 6px;
+  font: inherit;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+/* WebGL failure ------------------------------------------------------------ */
+
+.fallback {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--sp-5);
+  text-align: center;
+}

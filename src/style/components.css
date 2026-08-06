@@ -1,0 +1,524 @@
+/* Buttons ---------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 7px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.btn:active:not(:disabled) {
+  background: var(--surface-sunk);
+}
+
+.btn:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+/* The single yellow element on screen. Never more than one per view. */
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn--primary:active:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: transparent;
+}
+
+.btn--danger {
+  color: var(--danger);
+}
+
+.btn--icon {
+  padding: 7px;
+  aspect-ratio: 1;
+  justify-content: center;
+}
+
+.btn--sm {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--sh-2);
+}
+
+.btn-group .btn {
+  border-color: transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+}
+
+.btn-group .btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn-group .btn--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn-group .btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-group__sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 var(--sp-1);
+  background: var(--border);
+}
+
+/* Pills ------------------------------------------------------------------ */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px var(--sp-3) 4px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pill__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+}
+
+.pill__label {
+  color: var(--text-muted);
+}
+
+.pill__value {
+  font-weight: 600;
+}
+
+/* Cards ------------------------------------------------------------------ */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.card--affordable {
+  border-color: var(--accent);
+}
+
+.card--locked {
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+
+.card--owned {
+  opacity: 0.65;
+}
+
+.card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.card__price {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.card__check {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.card__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.card__note[hidden] {
+  display: none;
+}
+
+/* Pushed to the bottom so cards with different text lengths line their buttons up. */
+.card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding-top: var(--sp-1);
+}
+
+.card__spacer {
+  flex: 1;
+}
+
+.card__grants {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Progress --------------------------------------------------------------- */
+
+.progress {
+  height: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-sunk);
+  overflow: hidden;
+}
+
+.progress__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--t-base) var(--ease);
+}
+
+/* Missions --------------------------------------------------------------- */
+
+.mission {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+
+/* The mission being worked on is the only one that carries the accent. */
+.mission--active {
+  border-left-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.mission--done {
+  border-left-color: var(--success);
+  opacity: 0.6;
+}
+
+.mission--done .progress__fill {
+  background: var(--success);
+}
+
+.mission__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.mission__status {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.mission--done .mission__status {
+  color: var(--success);
+}
+
+.mission__reward {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* Panels ----------------------------------------------------------------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  box-shadow: var(--sh-3);
+  overflow: hidden;
+}
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel__body {
+  padding: var(--sp-4);
+  overflow: auto;
+}
+
+/* Floating HUD bar ------------------------------------------------------- */
+
+.hud {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--sh-2);
+}
+
+.hud__credits {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.hud__spacer {
+  flex: 1;
+}
+
+.hud__tick {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* A gain flashes the value rather than counting it up. */
+@keyframes gain-flash {
+  from {
+    background: var(--accent-soft);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.is-gain {
+  animation: gain-flash var(--t-base) var(--ease);
+  border-radius: var(--r-control);
+}
+
+/* Console ---------------------------------------------------------------- */
+
+.console {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--surface-sunk);
+  padding: var(--sp-2) 0;
+  overflow: auto;
+}
+
+.console__line {
+  display: flex;
+  gap: var(--sp-3);
+  padding: 1px var(--sp-4) 1px calc(var(--sp-4) - 2px);
+  border-left: 2px solid transparent;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.console__line--system {
+  border-left-color: var(--info);
+  color: var(--text-muted);
+}
+
+.console__line--error {
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.console__line--success {
+  border-left-color: var(--success);
+  color: var(--success);
+}
+
+.console__ref {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+
+/* Concept panel ---------------------------------------------------------- */
+
+.concept {
+  max-width: 520px;
+  width: 100%;
+}
+
+.concept__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.concept__body h2,
+.concept__body p {
+  margin: 0;
+}
+
+.concept__code {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-sunk);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.concept__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* The same concepts, re-readable, in the mission drawer. */
+.conceptlist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conceptlist li[hidden] {
+  display: none;
+}
+
+.conceptlink {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 6px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.conceptlink:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.conceptlink__no {
+  flex: none;
+  width: 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* Toast ------------------------------------------------------------------ */
+
+.toast {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  box-shadow: var(--sh-2);
+  max-width: 320px;
+}
+
+/* Misc ------------------------------------------------------------------- */
+
+kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 5px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  font-size: 11px;
+  text-align: center;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  border: 0;
+}

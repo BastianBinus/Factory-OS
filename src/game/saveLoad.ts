@@ -1,0 +1,175 @@
+import type { GameState } from './types';
+import {
+  DEFAULT_CAPACITY,
+  DEFAULT_REGROW_TICKS,
+  DEFAULT_TICK_RATE_MS,
+  ONBOARDING_DONE,
+  SAVE_VERSION,
+  STARTER_SCRIPT,
+  STARTING_UNLOCKS,
+  createInitialState,
+} from './GameState';
+import { readString, remove, writeString } from '../utils/storage';
+
+export const SAVE_KEY = 'factoryos.save';
+
+/**
+ * A save is the GameState verbatim — no separate DTO, because the state is
+ * already a plain JSON object by design. What this module adds is a version
+ * number, a migration chain and a paranoid read path: a corrupt or half-written
+ * save must never stop the game from starting, it just starts a new one.
+ */
+
+type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
+
+/**
+ * Keyed by the version being migrated *from*. Version 0 is any save written
+ * before versioning existed; it is filled up with today's defaults.
+ */
+const MIGRATIONS: Record<number, Migration> = {
+  0: (data) => ({
+    ...data,
+    tickRateMs: data['tickRateMs'] ?? DEFAULT_TICK_RATE_MS,
+    inventoryCapacity: data['inventoryCapacity'] ?? DEFAULT_CAPACITY,
+    oreRegrowTicks: data['oreRegrowTicks'] ?? DEFAULT_REGROW_TICKS,
+    seenConcepts: data['seenConcepts'] ?? [],
+    completedMissions: data['completedMissions'] ?? [],
+    unlocks: data['unlocks'] ?? [...STARTING_UNLOCKS],
+    script: data['script'] ?? STARTER_SCRIPT,
+    version: 1,
+  }),
+};
+
+export function serialize(state: GameState): string {
+  return JSON.stringify({ ...state, version: SAVE_VERSION });
+}
+
+export type LoadFailure = 'empty' | 'unreadable' | 'invalid' | 'too_new';
+
+export type LoadResult =
+  | { ok: true; state: GameState; migratedFrom?: number }
+  | { ok: false; reason: LoadFailure; message: string };
+
+export function deserialize(raw: string | null): LoadResult {
+  if (raw === null || raw.trim() === '') {
+    return { ok: false, reason: 'empty', message: 'No save found.' };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, reason: 'unreadable', message: 'The save could not be parsed as JSON.' };
+  }
+
+  if (!isRecord(parsed)) {
+    return { ok: false, reason: 'invalid', message: 'The save is not an object.' };
+  }
+
+  const originalVersion = typeof parsed['version'] === 'number' ? parsed['version'] : 0;
+  if (originalVersion > SAVE_VERSION) {
+    return {
+      ok: false,
+      reason: 'too_new',
+      message: `This save was written by a newer version of the game (${originalVersion}).`,
+    };
+  }
+
+  let data = parsed;
+  for (let version = originalVersion; version < SAVE_VERSION; version += 1) {
+    const migrate = MIGRATIONS[version];
+    if (!migrate) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        message: `No migration from save version ${version}.`,
+      };
+    }
+    data = migrate(data);
+  }
+
+  if (!isGameState(data)) {
+    return { ok: false, reason: 'invalid', message: 'The save is missing required fields.' };
+  }
+
+  const state = data;
+  state.version = SAVE_VERSION;
+  fillGaps(state);
+
+  return originalVersion === SAVE_VERSION
+    ? { ok: true, state }
+    : { ok: true, state, migratedFrom: originalVersion };
+}
+
+export function saveGame(state: GameState): boolean {
+  return writeString(SAVE_KEY, serialize(state));
+}
+
+export function loadGame(): LoadResult {
+  return deserialize(readString(SAVE_KEY));
+}
+
+/** What `main.ts` calls at boot: always returns something playable. */
+export function loadOrCreate(): { state: GameState; result: LoadResult } {
+  const result = loadGame();
+  return { state: result.ok ? result.state : createInitialState(), result };
+}
+
+export function clearSave(): void {
+  remove(SAVE_KEY);
+}
+
+// Validation ----------------------------------------------------------------
+
+/**
+ * Fields added to the state after a save was already written.
+ *
+ * They are filled in here rather than demanded by `isGameState`, because a field
+ * with an obvious default is not worth throwing a factory away over. The
+ * tutorial step in particular defaults to *finished*: a save that predates
+ * onboarding belongs to someone who has plainly already pressed Run once, and
+ * sending them back to step one would be the game forgetting, not helping.
+ */
+function fillGaps(state: Record<string, unknown> & GameState): void {
+  const step = state['onboardingStep'];
+  if (typeof step !== 'number' || !Number.isFinite(step)) {
+    state.onboardingStep = ONBOARDING_DONE;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Structural check only — deep enough that the engine cannot crash on a save,
+ * shallow enough that adding an optional field later does not invalidate saves.
+ */
+function isGameState(data: Record<string, unknown>): data is Record<string, unknown> & GameState {
+  const numbers = ['version', 'tick', 'credits', 'tickRateMs', 'inventoryCapacity', 'oreRegrowTicks'];
+  for (const key of numbers) {
+    if (typeof data[key] !== 'number' || !Number.isFinite(data[key])) return false;
+  }
+
+  if (typeof data['script'] !== 'string') return false;
+
+  const arrays = ['robots', 'unlocks', 'completedMissions', 'seenConcepts'];
+  for (const key of arrays) {
+    if (!Array.isArray(data[key])) return false;
+  }
+
+  const grid = data['grid'];
+  if (!isRecord(grid)) return false;
+  if (typeof grid['width'] !== 'number' || typeof grid['height'] !== 'number') return false;
+  if (!Array.isArray(grid['tiles'])) return false;
+  if (grid['tiles'].length !== grid['width'] * grid['height']) return false;
+
+  const stats = data['stats'];
+  if (!isRecord(stats)) return false;
+  for (const key of ['tilesMoved', 'oreMined', 'creditsEarned', 'itemsSold']) {
+    if (typeof stats[key] !== 'number') return false;
+  }
+  if (!isRecord(stats['crafted'])) return false;
+
+  return true;
+}

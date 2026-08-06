@@ -9,8 +9,9 @@ arrays, objects, `async`/`await` — explained in a short panel with a runnable 
 
 ## Status
 
-**Phase 0 of 8 — foundation and styleguide.** The game itself is not playable yet.
-The full specification lives in the plan file referenced under [Roadmap](#roadmap).
+**Phase 1 of 8 — the rules of the game are complete and tested, but nothing is on screen yet.**
+The whole simulation runs headlessly: a test plays a full round — mine, smelt, assemble, sell,
+buy an upgrade — through function calls alone.
 
 ## Getting started
 
@@ -40,6 +41,9 @@ phase has been done by hand.
 
 ```
 src/
+  game/        the rules: types, GameState, grid, resources, recipes,
+               economy, progression, saveLoad — plain data, no DOM
+  engine/      commands.ts today; tick scheduler and worker bridge in phase 3
   style/       tokens.css is the single source of truth for the visual language
   ui/          DOM components (theme toggle today, HUD/editor/panels later)
   utils/       EventBus, safe localStorage helpers
@@ -62,6 +66,11 @@ themes recolours the factory without a second colour table.
   learn here transfers unchanged to any other project.
 - **No UI framework, no game engine.** Plain TypeScript and DOM, plus Three.js for the viewport,
   so the source stays readable for someone learning the language.
+- **Every command costs exactly one tick.** Machines carry an input and an output buffer, so
+  `craft()` only *starts* the furnace and returns immediately — the robot can walk away and pick
+  the ingots up later with `take()`. Nothing in the engine has to model an action spanning ticks.
+- **`GameState` is plain JSON.** That is what makes the save file the state verbatim, the whole
+  rule set testable without a browser, and a cloud save in phase 8 a single column.
 
 ## Tech
 
@@ -72,8 +81,8 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Foundation, design tokens, theme system, styleguide | done |
-| 1 | Headless game core: grid, recipes, economy, commands | next |
-| 2 | 3D world: scene, procedural meshes, camera |  |
+| 1 | Headless game core: grid, recipes, economy, commands | done |
+| 2 | 3D world: scene, procedural meshes, camera | next |
 | 3 | Editor, worker sandbox, tick engine |  |
 | 4 | HUD, console, error experience, active-line highlight |  |
 | 5 | Economy, shop, tech tree, missions |  |

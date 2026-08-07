@@ -52,6 +52,29 @@ type step and component in both themes.
 A phase is only done when typecheck, tests and build all pass, and the browser check for that
 phase has been done by hand.
 
+## Deploying
+
+Merging to `main` does not publish anything. `vercel.json` disables automatic deployment for
+`main`, and the only thing that ships is **publishing a GitHub release** — the workflow in
+`.github/workflows/deploy-release.yml` then calls a Vercel deploy hook.
+
+The reason is that `main` is where work lands, not where it is finished. Pull requests still get
+their own Vercel preview URL, so a change can be opened and looked at without touching what
+players see; the release is the deliberate second step.
+
+The hook builds the tip of `main`, which it cannot be told to override. A release tagged at any
+other commit would therefore publish code that was never tagged, so the workflow compares the two
+first and refuses to deploy if they differ. Tag the tip of `main` and this never comes up.
+
+One-time setup:
+
+1. Import the repository at [vercel.com/new](https://vercel.com/new). The Vite preset is detected
+   automatically: `npm run build`, output `dist/`. No environment variables are needed until
+   phase 8.
+2. In the project: Settings → Git → Deploy Hooks → create one named `release` on branch `main`.
+3. Copy the URL into the repository under Settings → Secrets and variables → Actions → new
+   repository secret named `VERCEL_DEPLOY_HOOK`. The URL is a credential; it belongs nowhere else.
+
 ## Project structure
 
 ```

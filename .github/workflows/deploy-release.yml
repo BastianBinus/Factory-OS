@@ -1,0 +1,46 @@
+# Production deploys are tied to GitHub releases, not to pushes.
+#
+# `vercel.json` turns off automatic deployment for `main`, so merging a pull request
+# changes nothing that is publicly visible. Publishing a release is the one action that
+# ships. Feature branches still get their own preview URL from Vercel as before, which
+# is where a change gets looked at before it is ever tagged.
+name: Deploy release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The deploy hook builds whatever is at the tip of main - it cannot be pointed at a
+      # tag. So a release tagged anywhere else would ship code that was never tagged, and
+      # would do it silently. Better to fail loudly here than to guess.
+      - name: The release must point at the tip of main
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          tag_sha=$(git rev-parse "refs/tags/$TAG^{commit}")
+          main_sha=$(git rev-parse refs/remotes/origin/main)
+          if [ "$tag_sha" != "$main_sha" ]; then
+            echo "Tag $TAG is at $tag_sha, but main is at $main_sha."
+            echo "The deploy hook always builds the tip of main, so this release would"
+            echo "publish something other than what you tagged. Nothing was deployed."
+            exit 1
+          fi
+
+      - name: Trigger the Vercel production build
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "The VERCEL_DEPLOY_HOOK secret is empty or missing."
+            echo "Create it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          curl --silent --show-error --fail-with-body -X POST "$DEPLOY_HOOK"

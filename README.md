@@ -9,7 +9,7 @@ arrays, objects, `async`/`await` — explained in a short panel with a runnable 
 
 ## Status
 
-**Phase 6 of 8 — it teaches now.** Press `E` for the editor, write
+**Phase 8 of 8 — it teaches, it ships, and it now remembers you.** Press `E` for the editor, write
 `while (true) { await move('north'); await mine(); }` and hit `Ctrl+Enter`. The line the robot is
 executing lights up in tick rhythm, the HUD shows credits and cargo, and the console under the
 editor carries `print()` output and errors with a clickable line number. Errors are translated:
@@ -27,6 +27,11 @@ rather than for a Next button. From there a `Now` line under the HUD always name
 mission, how far along it is and which command it pays out, and every unlock that carries a new
 language concept opens a short panel explaining it once. The panels stay readable afterwards under
 `Missions`.
+
+`Sign in` is optional and always was. Without it the factory lives in this browser, exactly as it
+did for the first seven phases. With it, the same factory follows you to another browser — and
+four more concept panels open, because signing in is the first time the game does something over a
+network and that is worth explaining.
 
 ## Getting started
 
@@ -75,6 +80,36 @@ One-time setup:
 3. Copy the URL into the repository under Settings → Secrets and variables → Actions → new
    repository secret named `VERCEL_DEPLOY_HOOK`. The URL is a credential; it belongs nowhere else.
 
+## Cloud saves
+
+Optional, and the game is built so that it stays optional: with no Supabase credentials in the
+environment, `Sign in` explains that this build has no cloud and everything else behaves as before.
+
+Copy `.env.example` to `.env` and fill in two values from your Supabase project
+(Settings → API). Both are meant to be public — they ship inside the JavaScript bundle and are
+useless without a signed-in session, because the database refuses every row that is not yours.
+
+```bash
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+A `service_role` key must never appear here, in the bundle, or anywhere near the browser.
+
+The schema is one table and lives in `supabase/migrations/`. Every policy on it is written against
+`auth.uid()`, so the security boundary is the database rather than any query in the client — which
+is why nothing in `src/cloud/saveApi.ts` filters by user id.
+
+Two settings in the Supabase dashboard are not in the migration and have to be set by hand:
+
+1. Authentication → Providers → Email is on, with **Confirm email** switched off. Leaving it on
+   also works — the panel then tells the player to check their inbox — but nobody wants a
+   confirmation email to play a game.
+2. Authentication → URL Configuration: add the deployed origin so sessions are accepted there.
+
+For a deployed build, the same two variables go into the Vercel project under
+Settings → Environment Variables. They are read at build time, so a change needs a new deployment.
+
 ## Project structure
 
 ```
@@ -89,13 +124,18 @@ src/
                commands the player sees), protocol.ts (shared message types)
   render/      Three.js: Scene (camera, light, theme presets), meshFactory
                (procedural geometry), WorldView (state to scene), CameraControls
+  cloud/       optional Supabase layer: supabaseClient (returns null when
+               unconfigured), session (sign up/in/out), saveApi (the one row),
+               conflict (which save survives — pure), sync (the plumbing around it)
   style/       tokens.css is the single source of truth for the visual language
   ui/          DOM components: Hud, Controls, Editor, CodePanel, ConsolePanel,
                Drawer (shared overlay chrome), ShopPanel, MissionPanel,
-               ConceptPanel, Onboarding, GuideBar, Toast, ThemeToggle
+               ConceptPanel, AuthPanel, ConflictDialog, Onboarding, GuideBar,
+               Toast, ThemeToggle
   utils/       EventBus, safe localStorage helpers
   main.ts      app entry
   styleguide.ts  living styleguide page
+supabase/migrations/  the schema, exactly as applied
 tests/         Vitest suites for the headless game logic
 ```
 
@@ -147,6 +187,16 @@ themes recolours the factory without a second colour table.
   stop arriving, while an unlock or a completed mission is written immediately — progress you paid
   for should not depend on a timer. A save that cannot be read starts a new factory and says so,
   rather than refusing to boot.
+- **A cloud conflict is decided by progress, not by a clock.** The plan for phase 8 said "newest
+  `updated_at` wins", which quietly assumes both timestamps come from the same clock — one is
+  Postgres, the other is whatever the laptop thinks the time is, so a single wrong system clock
+  would win every conflict forever. Instead, a save that is ahead on *both* ticks and credits
+  contains the other one and is taken silently. When neither contains the other, the game asks,
+  because at that point nothing is qualified to choose. That dialog is the one modal with no
+  Escape: every dismissal would mean "decide later", and the next save is what deletes the loser.
+- **The cloud is additive, never authoritative.** Every write goes to localStorage first and to the
+  network afterwards, so a failed request leaves the cloud stale rather than the factory gone. The
+  timer-driven upload fails silently on purpose; only the deliberate moments report.
 
 ## Tech
 
@@ -163,5 +213,5 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 4 | HUD, console, error experience, active-line highlight | done |
 | 5 | Economy, shop, tech tree, missions | done |
 | 6 | Guided learning panels, onboarding | done |
-| 7 | Polish and deploy to Vercel | next |
-| 8 | Supabase: auth, cloud saves, edge functions |  |
+| 7 | Polish and deploy to Vercel | done |
+| 8 | Supabase: auth, cloud saves, conflict resolution | done |

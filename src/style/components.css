@@ -488,6 +488,133 @@
   color: var(--text-faint);
 }
 
+/* Account panel ---------------------------------------------------------- */
+
+.auth {
+  max-width: 420px;
+  width: 100%;
+}
+
+.auth__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.auth__form[hidden] {
+  display: none;
+}
+
+.auth__form p {
+  margin: 0;
+}
+
+.auth__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+/* An error the player caused, phrased as a note rather than an alarm. */
+.auth__note {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--r-control);
+  background: var(--danger-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.auth__note[hidden] {
+  display: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input {
+  padding: 8px var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+.input:focus-visible {
+  border-color: var(--info);
+}
+
+/* Two saves, one survivor ------------------------------------------------- */
+
+.conflict {
+  max-width: 560px;
+  width: 100%;
+}
+
+.conflict__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.conflict__body h2,
+.conflict__body p {
+  margin: 0;
+}
+
+.conflict__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+.conflict__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+
+.conflict__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--sp-3);
+  margin: 0;
+  font-size: 13px;
+}
+
+.conflict__facts dt {
+  color: var(--text-muted);
+}
+
+.conflict__facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.conflict__side .btn {
+  margin-top: auto;
+}
+
 /* Toast ------------------------------------------------------------------ */
 
 .toast {

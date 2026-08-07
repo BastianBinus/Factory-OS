@@ -3,6 +3,7 @@ import { createInitialState } from '../src/game/GameState';
 import {
   CONCEPTS,
   CONCEPT_COUNT,
+  cloudConcepts,
   conceptNumber,
   getConcept,
   markConceptSeen,
@@ -22,7 +23,9 @@ describe('the concept registry', () => {
 
   it('numbers concepts in teaching order, counting from one', () => {
     expect(conceptNumber('await')).toBe(1);
-    expect(conceptNumber('for_of')).toBe(CONCEPT_COUNT);
+    // The seven earned in the factory come first, the cloud lessons after them.
+    expect(conceptNumber('for_of')).toBe(7);
+    expect(conceptNumber('database_row')).toBe(CONCEPT_COUNT);
   });
 
   it('carries a title, a body and an example for every concept', () => {
@@ -47,8 +50,18 @@ describe('the concept registry', () => {
     const triggered = new Set<string>();
     for (const unlock of UNLOCKS) if (unlock.conceptId) triggered.add(unlock.conceptId);
     for (const mission of MISSIONS) if (mission.conceptId) triggered.add(mission.conceptId);
+    // The second trigger: signing in, which no row in the tech tree can express.
+    for (const concept of cloudConcepts()) triggered.add(concept.id);
 
     for (const concept of CONCEPTS) expect(triggered.has(concept.id), concept.id).toBe(true);
+  });
+
+  it('reaches the cloud lessons only through the cloud', () => {
+    const cloud = ids(cloudConcepts());
+    expect(cloud).toEqual(['promises', 'fetch', 'status_codes', 'database_row']);
+
+    for (const unlock of UNLOCKS) expect(cloud).not.toContain(unlock.conceptId);
+    for (const mission of MISSIONS) expect(cloud).not.toContain(mission.conceptId);
   });
 });
 
@@ -108,6 +121,22 @@ describe('what the player has been shown', () => {
     markConceptSeen(state, 'await');
 
     expect(state.seenConcepts).toEqual(['await']);
+  });
+
+  /**
+   * The cloud lessons invert the usual rule. Nothing in the factory can reach
+   * them, so being shown is what puts them in the list — otherwise they would
+   * disappear from the mission log the moment they were read.
+   */
+  it('counts a cloud lesson as reached once it has been shown', () => {
+    const state = createInitialState();
+    expect(ids(reachedConcepts(state))).not.toContain('promises');
+
+    markConceptSeen(state, 'promises');
+
+    expect(ids(reachedConcepts(state))).toContain('promises');
+    // Reached and seen at the same moment: it is never owed a second showing.
+    expect(ids(unseenConcepts(state))).not.toContain('promises');
   });
 
   // A save from an older build can name a concept this build no longer has.

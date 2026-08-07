@@ -14,6 +14,16 @@ import { readString, remove, writeString } from '../utils/storage';
 export const SAVE_KEY = 'factoryos.save';
 
 /**
+ * When the local save was last written, epoch milliseconds.
+ *
+ * Deliberately a second key rather than a field inside the save. The save is the
+ * GameState verbatim, and that equivalence is worth more than the convenience of
+ * one extra property - it is what lets a round trip be compared with `toEqual`.
+ * A missing or unreadable stamp reads as 0, which simply sorts as oldest.
+ */
+export const SAVE_STAMP_KEY = 'factoryos.savedAt';
+
+/**
  * A save is the GameState verbatim — no separate DTO, because the state is
  * already a plain JSON object by design. What this module adds is a version
  * number, a migration chain and a paranoid read path: a corrupt or half-written
@@ -102,7 +112,17 @@ export function deserialize(raw: string | null): LoadResult {
 }
 
 export function saveGame(state: GameState): boolean {
-  return writeString(SAVE_KEY, serialize(state));
+  const written = writeString(SAVE_KEY, serialize(state));
+  if (written) writeString(SAVE_STAMP_KEY, String(Date.now()));
+  return written;
+}
+
+/** Epoch milliseconds of the last local save, or 0 when there is none to trust. */
+export function localSavedAt(): number {
+  const raw = readString(SAVE_STAMP_KEY);
+  if (raw === null) return 0;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 export function loadGame(): LoadResult {
@@ -117,6 +137,7 @@ export function loadOrCreate(): { state: GameState; result: LoadResult } {
 
 export function clearSave(): void {
   remove(SAVE_KEY);
+  remove(SAVE_STAMP_KEY);
 }
 
 // Validation ----------------------------------------------------------------

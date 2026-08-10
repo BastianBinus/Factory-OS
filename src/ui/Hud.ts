@@ -1,6 +1,5 @@
 import type { GameState } from '../game/types';
-import { primaryRobot } from '../game/GameState';
-import { RESOURCES, RESOURCE_IDS, totalItems } from '../game/resources';
+import { RESOURCES, RESOURCE_IDS } from '../game/resources';
 import { createThemeToggle } from './ThemeToggle';
 
 /**
@@ -10,8 +9,8 @@ import { createThemeToggle } from './ThemeToggle';
  * Two deliberate details. Numbers change hard rather than counting up — a
  * counter that animates is unreadable at 120 ms per tick — but a gain flashes
  * once, so money arriving is still noticeable out of the corner of the eye. And
- * a pill only exists while the robot carries that resource, so the bar shows
- * the cargo hold rather than a row of zeroes.
+ * a pill only exists while the fleet carries that resource, so the bar shows
+ * the cargo holds rather than a row of zeroes.
  */
 
 export interface HudOptions {
@@ -86,11 +85,20 @@ export class Hud {
   }
 
   private paintCargo(state: GameState): void {
-    const inventory = primaryRobot(state)?.inventory ?? {};
-    this.empty.hidden = totalItems(inventory) > 0;
+    // Summed over the fleet: with two robots out there, a bar that showed only
+    // the first one's cargo would keep going empty for no visible reason.
+    const carried = new Map<string, number>();
+    for (const robot of state.robots) {
+      for (const id of RESOURCE_IDS) {
+        const amount = robot.inventory[id] ?? 0;
+        if (amount > 0) carried.set(id, (carried.get(id) ?? 0) + amount);
+      }
+    }
+
+    this.empty.hidden = carried.size > 0;
 
     for (const id of RESOURCE_IDS) {
-      const amount = inventory[id] ?? 0;
+      const amount = carried.get(id) ?? 0;
       const existing = this.pills.get(id);
 
       if (amount <= 0) {

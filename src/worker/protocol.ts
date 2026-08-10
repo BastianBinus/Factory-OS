@@ -9,6 +9,14 @@
 
 /** What `position()`, `inventory()` and `credits()` answer from, between ticks. */
 export interface StateSnapshot {
+  /**
+   * Which robot this worker drives. Every robot runs its own copy of the same
+   * source, so the identity has to arrive in the data — it cannot be read off
+   * the script.
+   */
+  robotId: string;
+  /** Position in `state.robots`. What `me().index` answers with. */
+  index: number;
   x: number;
   y: number;
   facing: string;

@@ -96,7 +96,19 @@ export type UnlockId =
   | 'tick_120'
   | 'robot_2';
 
-export type ConceptId = 'await' | 'while' | 'if_else' | 'functions' | 'arrays' | 'objects' | 'for_of';
+export type ConceptId =
+  | 'await'
+  | 'while'
+  | 'if_else'
+  | 'functions'
+  | 'arrays'
+  | 'objects'
+  | 'for_of'
+  // Reached by switching the cloud on rather than by playing.
+  | 'promises'
+  | 'fetch'
+  | 'status_codes'
+  | 'database_row';
 
 export interface ConceptDef {
   id: ConceptId;

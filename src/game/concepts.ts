@@ -116,7 +116,89 @@ for (const direction of route) {
   await move(direction);
 }`,
   },
+  {
+    id: 'promises',
+    title: 'Promises — the thing await was waiting for',
+    body:
+      'A promise is an object that stands for a value that does not exist yet, and it always ends up in one of two states: fulfilled with a result, or rejected with an error. ' +
+      'await is how you unwrap one — it hands you the result, or throws the error, once the promise settles. ' +
+      'Signing in just made four of them: the game asked a server far away for your save and waited, exactly the way your script waits for the robot.',
+    codeExample: `// await gives you the value inside
+const tile = await scan();
+
+// .then() is the same wait, written the older way
+scan().then((tile) => print(tile));
+
+// A rejected promise throws where you await it
+try {
+  await move('north');
+} catch (error) {
+  print('blocked:', error.message);
+}`,
+  },
+  {
+    id: 'fetch',
+    title: 'fetch — asking another computer',
+    body:
+      'fetch sends a request over the network and returns a promise for the response. ' +
+      'Nothing about it is instant, which is why it is a promise and why every line that uses it needs await. ' +
+      'Your script cannot call it — the sandbox removes it, so a runaway loop can never talk to the internet — but this is what the game itself runs the moment you press Sign in.',
+    codeExample: `const response = await fetch('https://example.com/save', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ credits: 400 }),
+});
+
+const data = await response.json();`,
+  },
+  {
+    id: 'status_codes',
+    title: 'Status codes — how a server answers',
+    body:
+      'Every HTTP response carries a three-digit number that says how it went, and the first digit is the whole story: 2xx worked, 4xx means the request was wrong, 5xx means the server broke. ' +
+      '401 says you are not signed in and 403 says you are, but this is not yours — which is precisely what would come back if you asked for someone else’s save. ' +
+      'A failed fetch does not throw; you have to look at response.ok yourself.',
+    codeExample: `const response = await fetch(url);
+
+if (!response.ok) {
+  print('the server said', response.status);
+}
+
+// 200 ok - 401 not signed in
+// 403 not yours - 404 no such thing
+// 500 the server is having a bad day`,
+  },
+  {
+    id: 'database_row',
+    title: 'A row — where your factory now lives',
+    body:
+      'A database table is a grid: columns decide what can be stored, and each row is one thing that stores it. ' +
+      'Your save is a single row in a table called game_saves, with a column for who you are, a column holding the entire factory as JSON, and a column for when it last changed. ' +
+      'A rule on that table lets each row be read only by the account in its user_id column, which is why nobody else can load your factory even if they ask for it directly.',
+    codeExample: `-- table: game_saves
+-- user_id                              | state          | updated_at
+-- 4f3c...  (you)                       | { "tick": 812 } | 15:04
+-- 91ab...  (someone else)              | { "tick": 12 }  | 09:20
+
+select state from game_saves;
+-- returns exactly one row: yours`,
+  },
 ];
+
+/**
+ * The four above that no purchase can reach.
+ *
+ * Everything else is earned inside the factory, but the cloud is not bought — it
+ * is switched on, or never is. So these are reached by having been shown: the
+ * first successful sign-in opens them and marks them seen, and from then on they
+ * sit in the mission log alongside the rest. A player who never signs in never
+ * meets them, which is correct: they would be answers to a question never asked.
+ */
+const CLOUD_CONCEPT_IDS: ConceptId[] = ['promises', 'fetch', 'status_codes', 'database_row'];
+
+export function cloudConcepts(): ConceptDef[] {
+  return CONCEPTS.filter((concept) => CLOUD_CONCEPT_IDS.includes(concept.id));
+}
 
 export const CONCEPT_COUNT = CONCEPTS.length;
 
@@ -143,6 +225,10 @@ export function reachedConcepts(state: GameState): ConceptDef[] {
   }
   for (const mission of MISSIONS) {
     if (mission.conceptId && state.completedMissions.includes(mission.id)) reached.add(mission.conceptId);
+  }
+  // Seen is what reached means for these — see CLOUD_CONCEPT_IDS.
+  for (const id of CLOUD_CONCEPT_IDS) {
+    if (state.seenConcepts.includes(id)) reached.add(id);
   }
 
   return CONCEPTS.filter((concept) => reached.has(concept.id));

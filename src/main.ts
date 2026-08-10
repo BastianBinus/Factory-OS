@@ -2,10 +2,14 @@ import './style/index';
 import './boot.css';
 import { initTheme, onThemeChange } from './ui/ThemeToggle';
 import { ONBOARDING_DONE, primaryRobot, resetWorld } from './game/GameState';
-import type { UnlockId } from './game/types';
+import type { GameState, UnlockId } from './game/types';
 import { buyUnlock, evaluateMissions, getUnlock, unlockedCommands } from './game/progression';
-import { markConceptSeen, unseenConcepts } from './game/concepts';
-import { loadOrCreate, saveGame } from './game/saveLoad';
+import { cloudConcepts, markConceptSeen, unseenConcepts } from './game/concepts';
+import { loadOrCreate, localSavedAt, saveGame } from './game/saveLoad';
+import { isCloudConfigured } from './cloud/supabaseClient';
+import { currentEmail } from './cloud/session';
+import { pushSave } from './cloud/saveApi';
+import { syncWithCloud } from './cloud/sync';
 import { advanceWorld } from './engine/commands';
 import { runCommand } from './engine/dispatch';
 import { ActionQueue } from './engine/ActionQueue';
@@ -19,8 +23,10 @@ import { Scene } from './render/Scene';
 import { WorldView } from './render/WorldView';
 import type { HoverInfo } from './render/WorldView';
 import { CameraControls } from './render/CameraControls';
+import { AuthPanel } from './ui/AuthPanel';
 import { CodePanel } from './ui/CodePanel';
 import { ConceptPanel } from './ui/ConceptPanel';
+import { ConflictDialog } from './ui/ConflictDialog';
 import { Controls } from './ui/Controls';
 import { GuideBar } from './ui/GuideBar';
 import { Hud } from './ui/Hud';
@@ -222,6 +228,23 @@ const hud = new Hud({ parent: topStack });
 const guide = new GuideBar({ parent: topStack, onOpen: () => missions.setOpen(true) });
 const toasts = new Toasts({ parent: app });
 const conceptPanel = new ConceptPanel({ parent: app });
+const conflictDialog = new ConflictDialog({ parent: app });
+
+const authPanel = new AuthPanel({
+  parent: app,
+  onSignedIn: (email) => {
+    paintAccount(email);
+    codePanel.console.system(`Signed in as ${email}.`);
+    // The lesson waits for the sync: a conflict question first, then the reading.
+    void syncNow().then(() => showCloudConcepts());
+  },
+  onSignedOut: () => {
+    paintAccount(null);
+    // The factory itself is untouched: it lives in this browser too, and always did.
+    codePanel.console.system('Signed out. This browser keeps its own save.');
+  },
+  onSync: () => void syncNow(),
+});
 
 const codePanel = new CodePanel({
   parent: app,
@@ -315,6 +338,30 @@ function showNewConcepts(): void {
     markConceptSeen(state, concept.id);
     conceptPanel.show(concept);
   }
+
+  if (cloudLessonsPending) showCloudConcepts();
+}
+
+/** Set when someone signs in mid-tutorial: the lesson is owed, just not yet. */
+let cloudLessonsPending = false;
+
+/**
+ * What signing in teaches. Held back during the tutorial for the same reason
+ * every other concept is — step one of learning to move a robot is no place for
+ * four panels about HTTP.
+ */
+function showCloudConcepts(): void {
+  if (!onboarding.done) {
+    cloudLessonsPending = true;
+    return;
+  }
+
+  cloudLessonsPending = false;
+  for (const concept of cloudConcepts()) {
+    if (state.seenConcepts.includes(concept.id)) continue;
+    markConceptSeen(state, concept.id);
+    conceptPanel.show(concept);
+  }
 }
 
 const controls = new Controls({
@@ -337,6 +384,10 @@ const controls = new Controls({
 
 controls.addButton('Shop', 'Spend credits on commands and upgrades', () => shop.toggle());
 controls.addButton('Missions', 'The mission chain and what it unlocks', () => missions.toggle());
+
+const accountButton = controls.addButton('Sign in', 'Keep this factory across browsers', () =>
+  authPanel.toggle(),
+);
 
 /**
  * Back to the opening floor, keeping everything the player earned. Whatever was
@@ -444,6 +495,7 @@ function scheduleSave(): void {
   saveTimer = window.setTimeout(() => {
     saveTimer = null;
     saveGame(state);
+    scheduleCloudSave();
   }, SAVE_DELAY_MS);
 }
 
@@ -454,9 +506,108 @@ function saveNow(): void {
     saveTimer = null;
   }
   saveGame(state);
+  pushCloudNow();
 }
 
 window.addEventListener('beforeunload', () => saveNow());
+
+// Cloud --------------------------------------------------------------------------
+
+/**
+ * Signing in adds a copy of the save; it never becomes the only one. Every write
+ * below happens after the local save, and every read is filtered through the same
+ * conflict rules, so the worst a broken network can do is leave the cloud behind.
+ * The game itself does not notice either way.
+ */
+
+/** Long, because this is a network round trip and not a string in localStorage. */
+const CLOUD_SAVE_DELAY_MS = 20_000;
+
+let signedInAs: string | null = null;
+let cloudTimer: number | null = null;
+
+function paintAccount(email: string | null): void {
+  signedInAs = email;
+  authPanel.setEmail(email);
+  accountButton.textContent = email === null ? 'Sign in' : 'Account';
+  accountButton.title = email === null ? 'Keep this factory across browsers' : `Signed in as ${email}`;
+}
+
+function scheduleCloudSave(): void {
+  if (signedInAs === null || cloudTimer !== null) return;
+  cloudTimer = window.setTimeout(() => {
+    cloudTimer = null;
+    // Silent on failure on purpose: this fires on a timer the player never asked
+    // for, and a toast about the network every twenty seconds helps nobody.
+    void pushSave(state);
+  }, CLOUD_SAVE_DELAY_MS);
+}
+
+/** The moments worth a round trip immediately: an unlock, a mission, leaving. */
+function pushCloudNow(): void {
+  if (signedInAs === null) return;
+  if (cloudTimer !== null) {
+    window.clearTimeout(cloudTimer);
+    cloudTimer = null;
+  }
+  void pushSave(state).then((result) => {
+    if (!result.ok) codePanel.console.error('The cloud save was refused.', null, result.message);
+  });
+}
+
+async function syncNow(): Promise<void> {
+  if (signedInAs === null) return;
+
+  const outcome = await syncWithCloud({
+    state,
+    localSavedAt: localSavedAt(),
+    ask: (local, cloud) => conflictDialog.ask(local, cloud),
+    adopt: (next) => adoptCloudSave(next),
+  });
+
+  switch (outcome.kind) {
+    case 'failed':
+      toasts.show('Cloud sync failed', outcome.message, 'error');
+      codePanel.console.error('Cloud sync failed.', null, outcome.message);
+      return;
+    case 'adopted':
+      toasts.show('Cloud save loaded', 'This browser now matches the cloud.', 'success');
+      codePanel.console.system('The cloud save was further along, so it was loaded.');
+      return;
+    default:
+      codePanel.console.system('This factory is now in the cloud.');
+  }
+}
+
+/**
+ * Installing a save that came from somewhere else. The state object is refilled
+ * rather than replaced, because every module in this file holds a reference to it
+ * and a swap would leave half the game looking at the old world.
+ */
+function adoptCloudSave(next: GameState): void {
+  if (runner.running) runner.stop('user');
+  queue.clear();
+
+  Object.assign(state, next);
+  codePanel.editor.value = state.script;
+
+  applyProgress();
+  worldView.sync(state);
+  // Nothing here travelled: the robot is simply somewhere else now.
+  worldView.snapRobots();
+}
+
+/** A session outlives a reload, so the button has to catch up with it at boot. */
+async function restoreAccount(): Promise<void> {
+  const email = await currentEmail();
+  if (email === null) return;
+
+  paintAccount(email);
+  codePanel.console.system(`Signed in as ${email}.`);
+  await syncNow();
+}
+
+if (isCloudConfigured()) void restoreAccount();
 
 function runScript(): void {
   queue.clear();
@@ -527,6 +678,15 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !typing) {
     // Innermost first: the modal, then a drawer, and only with nothing in the
     // way does Escape mean stop. Anything else ends a run nobody asked to end.
+
+    // The conflict dialog swallows the key rather than closing. Dismissing it
+    // would be answering its question with silence, and it has no silent answer.
+    if (conflictDialog.isOpen) return;
+
+    if (authPanel.isOpen) {
+      authPanel.close();
+      return;
+    }
     if (conceptPanel.isOpen) {
       conceptPanel.close();
       return;

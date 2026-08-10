@@ -31,6 +31,17 @@ svg {
   max-width: 100%;
 }
 
+/*
+ * The browser hides [hidden] with a rule of the lowest possible weight, so any
+ * class that sets `display` beats it - `.btn { display: inline-flex }` already
+ * did, which left buttons on screen that code had explicitly hidden. This is the
+ * one place where !important earns its keep: `hidden` should mean hidden, and
+ * every alternative is a per-component rule that someone has to remember.
+ */
+[hidden] {
+  display: none !important;
+}
+
 button,
 input,
 textarea,

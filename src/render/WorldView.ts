@@ -14,12 +14,20 @@ import {
   Raycaster,
   Vector2,
 } from 'three';
-import type { GameState, Grid, Robot, Tile } from '../game/types';
+import type { GameState, Grid, MachineId, Robot, Tile } from '../game/types';
 import { ORE_NODE_AMOUNT } from '../game/GameState';
 import { indexOf, tileAt } from '../game/grid';
 import type { WorldPalette } from './palette';
-import type { MachineView, OreView } from './meshFactory';
-import { WorldGeometry, WorldMaterials, createMachine, createMarket, createOre, createRobot } from './meshFactory';
+import type { GroundView, MachineView, OreView } from './meshFactory';
+import {
+  WorldGeometry,
+  WorldMaterials,
+  createGround,
+  createMachine,
+  createMarket,
+  createOre,
+  createRobot,
+} from './meshFactory';
 import type { Scene } from './Scene';
 
 /**
@@ -38,6 +46,7 @@ export interface HoverInfo {
 }
 
 interface TileView {
+  ground?: GroundView;
   ore?: OreView;
   machine?: MachineView;
   group: Group;
@@ -190,6 +199,10 @@ export class WorldView {
 
   private buildTile(tile: Tile): TileView | null {
     switch (tile.kind) {
+      case 'ground': {
+        const ground = createGround(this.geometry, this.materials);
+        return { ground, group: ground.group };
+      }
       case 'ore': {
         const ore = createOre(this.geometry, this.materials, tile.resource);
         return { ore, group: ore.group };
@@ -209,6 +222,7 @@ export class WorldView {
     for (const [index, view] of this.tiles) {
       const tile = state.grid.tiles[index];
       if (!tile) continue;
+      if (tile.kind === 'ground') view.ground?.setState(tile.state, tile.resource);
       if (tile.kind === 'ore') view.ore?.setFill(tile.amount / ORE_NODE_AMOUNT);
       if (tile.kind === 'machine') view.machine?.setBusy(tile.job !== null);
     }
@@ -434,12 +448,26 @@ function gridLineGeometry(width: number, height: number): BufferGeometry {
   return geometry;
 }
 
-/** Cheap way to notice a rebuild is needed: size plus what sits on every tile. */
+const MACHINE_MARK: Record<MachineId, string> = {
+  smelter: 's',
+  assembler: 'a',
+  seeder: 'd',
+};
+
+/**
+ * Cheap way to notice a rebuild is needed: size plus what sits on every tile.
+ *
+ * Every ground state maps to the same character deliberately. A tile going from
+ * prepared to growing to ripe is a change the *views* handle in `syncTiles`; if
+ * it changed the signature instead, the whole floor would be torn down and
+ * rebuilt on the tick a single crop came in.
+ */
 function gridSignature(grid: Grid): string {
   const kinds = grid.tiles
     .map((tile) => {
+      if (tile.kind === 'ground') return '.';
       if (tile.kind === 'ore') return tile.resource === 'iron_ore' ? 'i' : 'c';
-      if (tile.kind === 'machine') return tile.machine === 'smelter' ? 's' : 'a';
+      if (tile.kind === 'machine') return MACHINE_MARK[tile.machine];
       return tile.kind === 'market' ? 'm' : '.';
     })
     .join('');

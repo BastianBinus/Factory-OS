@@ -2,7 +2,7 @@ import './style/index';
 import './boot.css';
 import { initTheme, onThemeChange } from './ui/ThemeToggle';
 import { ONBOARDING_DONE, primaryRobot, resetWorld } from './game/GameState';
-import type { GameState, UnlockId } from './game/types';
+import type { GameState, GroundTile, UnlockId } from './game/types';
 import { buyUnlock, evaluateMissions, getUnlock, unlockedCommands } from './game/progression';
 import { cloudConcepts, markConceptSeen, unseenConcepts } from './game/concepts';
 import { loadOrCreate, localSavedAt, saveGame } from './game/saveLoad';
@@ -733,6 +733,8 @@ function paintTooltip(info: HoverInfo | null): void {
 function describeHoveredTile(info: HoverInfo): string {
   const tile = info.tile;
   switch (tile.kind) {
+    case 'ground':
+      return describeGround(tile);
     case 'ore':
       return `${tile.resource} (${tile.amount})`;
     case 'machine':
@@ -741,6 +743,19 @@ function describeHoveredTile(info: HoverInfo): string {
       return 'market';
     default:
       return 'floor';
+  }
+}
+
+function describeGround(tile: GroundTile): string {
+  switch (tile.state) {
+    case 'raw':
+      return 'raw ground — clear() it';
+    case 'prepared':
+      return 'prepared — seed() it';
+    case 'growing':
+      return `${tile.resource ?? 'crop'}, growing`;
+    case 'ripe':
+      return `${tile.resource ?? 'crop'}, ripe (${tile.yield})`;
   }
 }
 

@@ -54,6 +54,56 @@ Plus one addition that is ours, not TFWR's, because this is a factory game:
 The reinvestment arm is what makes it an economy rather than a collection: seed crystals are
 crafted from ore, so a share of every harvest must go back into the ground.
 
+### 3.1 The loop that actually matters
+
+The material flow above is the surface. The loop the game is *built around* is the one below, and it
+is the whole reason TFWR works:
+
+```
+   resources pile up
+          │
+          ▼
+   buy an unlock with them          ← no mission, no objective, no permission
+          │
+          ▼
+   its tutorial panel opens         ← one new concept, one new command
+          │
+          ▼
+   rewrite the program to use it    ← the program gets better because you got better
+          │
+          ▼
+   resources pile up FASTER
+          │
+          └──────────────▶ repeat, one tier up
+```
+
+Every rule elsewhere in this document exists to protect that spiral:
+
+- **Resources as currency** (§5) — so the loop closes without a detour through selling.
+- **Exponential costs** (§5) — so the old program *stops being good enough* and you have to come back.
+- **Mandatory algorithms** (§6) — so "better program" means a better *idea*, not more lines.
+- **No missions** (§7) — so nothing hands you the goal; the price tag is the goal.
+- **Throughput meter** (§8) — so "faster" is a number you can watch move.
+
+If a change makes this spiral weaker, it is the wrong change, whatever else it improves.
+
+### 3.2 Language: JavaScript with explicit `await`
+
+Reopened on 2026-08-11 and settled. TFWR's Python reads cleaner because `harvest()` blocks; our
+worker cannot block without `SharedArrayBuffer`, rejected in phase 0 for hosting reasons. So every
+command needs `await`, which is noisier.
+
+Rejected alternatives, with reasons, so this does not get reopened again:
+
+| Option | Why not |
+|---|---|
+| Auto-inject `await` before compiling | Reads clean, but teaches syntax that is not valid JavaScript. The script would break the moment it left the game |
+| Python via Skulpt | Genuinely the cleanest syntax and closest to TFWR, but rewrites the worker, editor mode, line mapper and error hints — and the project exists to teach JS |
+| Java | Only real argument is that it matches Modul320 coursework. No light browser runtime exists (CheerpJ is 10–20 MB, TeaVM cannot compile at runtime, a custom interpreter was rejected in phase 0), and per-tick suspension has no clean story. Would delete the Worker + `AsyncFunction` + `lineMapper` stack that phases 3–4 are built on, taking the glowing active line with it |
+
+`await` stays visible and stays taught as concept #1. It is real, current JavaScript, and the cost is
+one keyword per line.
+
 ## 4. World model
 
 Replaces `FloorTile` and `OreTile` with one ground tile carrying a state machine. One tile kind

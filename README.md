@@ -116,8 +116,9 @@ Settings → Environment Variables. They are read at build time, so a change nee
 src/
   game/        the rules: types, GameState, grid, resources, recipes,
                economy, progression, concepts, saveLoad — plain data, no DOM
-  engine/      the clock and the bridge to the worker: TickScheduler, ActionQueue,
-               ScriptRunner (worker lifecycle + watchdog), commands, dispatch,
+  engine/      the clock and the bridge to the workers: TickScheduler, ActionQueue,
+               ScriptRunner (worker lifecycle + watchdog), Fleet (one runner per
+               robot, all running the same source), commands, dispatch,
                lineMapper (stack trace to author line), errorHints (raw error
                to something a beginner can act on)
   worker/      sandbox.worker.ts (hardened worker, AsyncFunction), api.ts (the
@@ -194,6 +195,12 @@ themes recolours the factory without a second colour table.
   contains the other one and is taken silently. When neither contains the other, the game asks,
   because at that point nothing is qualified to choose. That dialog is the one modal with no
   Escape: every dismissal would mean "decide later", and the next save is what deletes the loser.
+- **Every robot gets its own worker.** A single worker can hold exactly one `await`, so one script
+  could never have two robots mid-action. Instead each robot runs its own copy of the same source
+  and `me()` tells it which one it is — the one thing it cannot read off a file they all share.
+  `Fleet` owns the runners and hands every message back to the robot it came from. An error stops
+  the whole fleet: identical sources run into identical errors, and half a factory still moving
+  after a crash is harder to read than an honest stop.
 - **The cloud is additive, never authoritative.** Every write goes to localStorage first and to the
   network afterwards, so a failed request leaves the cloud stale rather than the factory gone. The
   timer-driven upload fails silently on purpose; only the deliberate moments report.
@@ -215,3 +222,16 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 6 | Guided learning panels, onboarding | done |
 | 7 | Polish and deploy to Vercel | done |
 | 8 | Supabase: auth, cloud saves, conflict resolution | done |
+| 9a | A worker per robot: the second robot actually runs the script | done |
+| 10a | Cultivation core: clear, seed, grow, mine — nothing regrows free | designed |
+| 10b | Resources become the currency; credits and the mission chain removed | designed |
+| 10c | Throughput meter and bottleneck graphs (absorbs 9c) | designed |
+| 10d | Calibration and sorting bay — the first mandatory algorithms | designed |
+| 10e | Foundry pour and pipe routing | designed |
+| 10f | Conveyor belts (absorbs 9b) | designed |
+| 9d | Script library with real modules | planned |
+
+Phase 10 reworks the gameplay loop along the lines of *The Farmer Was Replaced*: the player plants
+and harvests rather than collecting from nodes that refill themselves, resources are spent directly
+instead of sold for credits, and each tier is impossible without a specific algorithm. Full design:
+[`docs/specs/2026-08-11-gameplay-loop-redesign.md`](docs/specs/2026-08-11-gameplay-loop-redesign.md).

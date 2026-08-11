@@ -43,6 +43,10 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
   position: { detail: 'position()', info: 'The robot position as {x, y}. Costs no tick.' },
   inventory: { detail: 'inventory()', info: 'What the robot carries. Costs no tick.' },
   credits: { detail: 'credits()', info: 'Your credits right now. Costs no tick.' },
+  me: {
+    detail: 'me()',
+    info: 'Which robot is running this copy of the script, as {id, index}. Costs no tick.',
+  },
   reset: {
     detail: 'await reset()',
     info: 'Put the floor back to the start: robot parked, ore full, machines empty. Your credits and unlocks stay. Costs no tick.',
@@ -50,7 +54,7 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
 };
 
 /** Commands that block are worth spelling out with their `await`. */
-const INSTANT = new Set(['print', 'position', 'inventory', 'credits']);
+const INSTANT = new Set(['print', 'position', 'inventory', 'credits', 'me']);
 
 function completionsFor(commands: string[]): Completion[] {
   return commands.map((name) => {
@@ -67,11 +71,15 @@ function completionsFor(commands: string[]): Completion[] {
 }
 
 /**
- * The line the robot is executing right now. It is a separate decoration from
+ * The lines being executed right now. It is a separate decoration from
  * CodeMirror's own active line, which follows the cursor — while a script runs,
  * the two are usually nowhere near each other.
+ *
+ * A set rather than a single line, because every robot runs its own copy of this
+ * same file and they are rarely in the same place. Marking only one of them
+ * would quietly claim the others are idle.
  */
-const setRunningLine = StateEffect.define<number | null>();
+const setRunningLines = StateEffect.define<readonly number[]>();
 
 const RUNNING_LINE = Decoration.line({ class: 'cm-runningLine' });
 
@@ -79,10 +87,16 @@ const runningLineField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(value, transaction) {
     for (const effect of transaction.effects) {
-      if (!effect.is(setRunningLine)) continue;
-      const line = effect.value;
-      if (line === null || line < 1 || line > transaction.state.doc.lines) return Decoration.none;
-      return Decoration.set([RUNNING_LINE.range(transaction.state.doc.line(line).from)]);
+      if (!effect.is(setRunningLines)) continue;
+      const doc = transaction.state.doc;
+      // Out-of-range lines are dropped rather than clamped: a mark on the wrong
+      // line is a lie, and no mark is the honest fallback. Sorted because
+      // CodeMirror wants its ranges in document order, deduplicated because two
+      // robots on the same line are one highlight.
+      const lines = [...new Set(effect.value)]
+        .filter((line) => line >= 1 && line <= doc.lines)
+        .sort((a, b) => a - b);
+      return Decoration.set(lines.map((line) => RUNNING_LINE.range(doc.line(line).from)));
     }
     // An edit while the script runs would leave the mark on the wrong text.
     return transaction.docChanged ? Decoration.none : value;
@@ -227,12 +241,11 @@ export class Editor {
   }
 
   /**
-   * Marks the line the robot is currently executing, or clears the mark with
-   * `null`. Out-of-range lines clear it too: a stale highlight on the wrong
-   * line is a lie, and no highlight is the honest fallback.
+   * Marks every line a robot is currently executing. An empty list clears the
+   * marks, which is what a stopped script leaves behind.
    */
-  setRunningLine(line: number | null): void {
-    this.view.dispatch({ effects: setRunningLine.of(line) });
+  setRunningLines(lines: readonly number[]): void {
+    this.view.dispatch({ effects: setRunningLines.of(lines) });
   }
 
   /** Puts the cursor on a line, used when a console error is clicked. */

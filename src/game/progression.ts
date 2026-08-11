@@ -130,6 +130,8 @@ export const UNLOCKS: UnlockDef[] = [
     description: 'Expand the factory once more.',
     cost: 2500,
     requiresUnlocks: ['grid_12'],
+    // The floor that finally makes a hand-counted route unreadable.
+    conceptId: 'for_of',
   },
   {
     id: 'robot_2',
@@ -137,7 +139,8 @@ export const UNLOCKS: UnlockDef[] = [
     description: 'A second robot rolls off the ramp. It runs the same script.',
     cost: 5000,
     requiresMission: 'm6_rich',
-    conceptId: 'for_of',
+    // me() only means anything once there is someone else to be told apart from.
+    commands: ['me'],
   },
 ];
 

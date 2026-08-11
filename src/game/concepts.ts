@@ -109,7 +109,7 @@ print(await scanAt(smelter.x, smelter.y));`,
     body:
       'A for…of loop walks through an array and hands you one item at a time, without you counting positions yourself. ' +
       'It replaces the counter, the condition and the index lookup with a single line. ' +
-      'With a second robot and a list of places to be, that is the difference between a script you can read and one you cannot.',
+      'On a floor this wide a route is a long list, and that is the difference between a script you can read and one you cannot.',
     codeExample: `const route = ['south', 'south', 'east'];
 
 for (const direction of route) {

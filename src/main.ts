@@ -16,6 +16,7 @@ import { ActionQueue } from './engine/ActionQueue';
 import { TickScheduler } from './engine/TickScheduler';
 import { ScriptRunner } from './engine/ScriptRunner';
 import type { StopReason } from './engine/ScriptRunner';
+import { Fleet } from './engine/Fleet';
 import { explainError } from './engine/errorHints';
 import type { StateSnapshot } from './worker/protocol';
 import { readPalette } from './render/palette';
@@ -99,10 +100,13 @@ scene.start((delta) => worldView.update(delta));
 
 const queue = new ActionQueue();
 
-/** What the script can read between ticks without spending one. */
-function snapshot(): StateSnapshot {
-  const robot = primaryRobot(state);
+/** What the script in one robot's worker can read between ticks. */
+function snapshotOf(robotId: string): StateSnapshot {
+  const index = state.robots.findIndex((entry) => entry.id === robotId);
+  const robot = index === -1 ? undefined : state.robots[index];
   return {
+    robotId,
+    index: Math.max(index, 0),
     x: robot?.x ?? 0,
     y: robot?.y ?? 0,
     facing: robot?.facing ?? 'south',
@@ -112,62 +116,114 @@ function snapshot(): StateSnapshot {
   };
 }
 
-const runner = new ScriptRunner({
-  onReady(lineNumbers) {
-    if (!lineNumbers) {
+/** How a robot is named in the console, once there is more than one of them. */
+function robotLabel(robotId: string): string {
+  const index = state.robots.findIndex((entry) => entry.id === robotId);
+  return `robot ${Math.max(index, 0) + 1}`;
+}
+
+/** Only worth saying once per run, no matter how many workers report it. */
+let lineNumbersReported = false;
+
+/**
+ * The line each robot is on right now. Kept here rather than in the editor
+ * because a robot that stops mid-run has to lose its mark without disturbing
+ * the others.
+ */
+const runningLines = new Map<string, number>();
+
+function markRunningLine(robotId: string, line: number | null): void {
+  if (line === null) runningLines.delete(robotId);
+  else runningLines.set(robotId, line);
+  codePanel.editor.setRunningLines([...runningLines.values()]);
+}
+
+const fleet = new Fleet({
+  createRunner: (_robotId, handlers) => new ScriptRunner(handlers),
+
+  handlers: {
+    onReady(_robotId, lineNumbers) {
+      if (lineNumbers || lineNumbersReported) return;
+      lineNumbersReported = true;
       codePanel.console.system('This browser hides line numbers from us — errors will not point at a line.');
-    }
-  },
+    },
 
-  onAction(action) {
-    // reset() is not something the robot does, so it never waits for a tick —
-    // it is answered the moment it arrives, with the fresh world in the reply.
-    if (action.command === 'reset') {
-      codePanel.editor.setRunningLine(action.line);
-      resetFloor('Script reset the floor.');
-      runner.resolve(action.id, null, snapshot());
-      return;
-    }
+    onAction(robotId, action) {
+      // reset() is not something the robot does, so it never waits for a tick —
+      // it is answered the moment it arrives, with the fresh world in the reply.
+      if (action.command === 'reset') {
+        resetFromScript(robotId, action.id, action.line);
+        return;
+      }
 
-    const robot = primaryRobot(state);
-    if (!robot) return;
-    queue.push({
-      id: action.id,
-      robotId: robot.id,
-      command: action.command,
-      args: action.args,
-      line: action.line,
-    });
-  },
+      queue.push({
+        id: action.id,
+        robotId,
+        command: action.command,
+        args: action.args,
+        line: action.line,
+      });
+    },
 
-  onLog(text, line) {
-    // print() costs no tick, so this is the only moment its line is the live one.
-    codePanel.editor.setRunningLine(line);
-    codePanel.console.print(text);
-  },
+    onLog(robotId, text, line) {
+      // print() costs no tick, so this is the only moment its line is the live one.
+      markRunningLine(robotId, line);
+      codePanel.console.print(prefixed(robotId, text));
+    },
 
-  onError(error) {
-    reportError(error);
-  },
+    onError(robotId, error) {
+      reportError(error, robotId);
+    },
 
-  onStopped(reason) {
-    scheduler.stop();
-    queue.clear();
-    codePanel.editor.setRunningLine(null);
-    controls.update({ running: false, paused: false });
-    codePanel.console.system(stopMessage(reason));
+    onIdle(reason) {
+      scheduler.stop();
+      queue.clear();
+      runningLines.clear();
+      codePanel.editor.setRunningLines([]);
+      controls.update({ running: false, paused: false });
+      codePanel.console.system(stopMessage(reason));
+    },
   },
 });
+
+/** Says who is talking, but only while there is someone to confuse them with. */
+function prefixed(robotId: string, text: string): string {
+  return state.robots.length > 1 ? `[${robotLabel(robotId)}] ${text}` : text;
+}
+
+const RESET_REFUSED =
+  'reset() may only be called by robot 1. Every robot runs this same script, so the others ' +
+  'would reset the floor a second time in the same tick. Guard it with me().index === 0.';
+
+/**
+ * A reset asked for by the script. Refused for everyone but the first robot,
+ * with a sentence that says what to write instead — a silent no-op would look
+ * like reset() being broken.
+ */
+function resetFromScript(robotId: string, actionId: number, line: number | null): void {
+  if (primaryRobot(state)?.id !== robotId) {
+    fleet.reject(robotId, actionId, RESET_REFUSED, snapshotOf(robotId));
+    return;
+  }
+
+  markRunningLine(robotId, line);
+  resetFloor('Script reset the floor.');
+  fleet.resolve(robotId, actionId, null, snapshotOf(robotId));
+}
 
 /**
  * A raw engine error becomes a sentence the player can act on, in the console
  * where it can be re-read — and, if the editor is closed, as a toast, because a
  * script that stopped for a reason nobody saw is the worst version of this.
  */
-function reportError(error: { name: string; message: string; line: number | null }): void {
+function reportError(
+  error: { name: string; message: string; line: number | null },
+  robotId?: string,
+): void {
   const hint = explainError(error, unlockedCommands(state));
-  codePanel.console.error(hint.message, hint.line, hint.detail);
-  if (!codePanel.isOpen) toasts.show(hint.message, hint.detail, 'error');
+  const message = robotId === undefined ? hint.message : prefixed(robotId, hint.message);
+  codePanel.console.error(message, hint.line, hint.detail);
+  if (!codePanel.isOpen) toasts.show(message, hint.detail, 'error');
 }
 
 function stopMessage(reason: StopReason): string {
@@ -196,18 +252,23 @@ const scheduler = new TickScheduler({
 function tick(): void {
   state.tick += 1;
 
-  const robot = primaryRobot(state);
-  const action = robot ? queue.take(robot.id) : undefined;
-  let outcome: { id: number; ok: boolean; value: unknown; error: string } | null = null;
+  const outcomes: { robotId: string; id: number; ok: boolean; value: unknown; error: string }[] = [];
 
-  if (robot && action) {
+  // Array order, always: with two robots reaching for the same ore, the tick
+  // that decides who gets it has to be the same one every time.
+  for (const robot of state.robots) {
+    const action = queue.take(robot.id);
+    if (!action) continue;
+
     // The highlight moves as the action runs, which is what makes it read as a
     // program stepping rather than a robot wandering.
-    codePanel.editor.setRunningLine(action.line);
+    markRunningLine(robot.id, action.line);
     const result = runCommand(action.command, { state, robot }, action.args);
-    outcome = result.ok
-      ? { id: action.id, ok: true, value: result.value, error: '' }
-      : { id: action.id, ok: false, value: null, error: result.error };
+    outcomes.push(
+      result.ok
+        ? { robotId: robot.id, id: action.id, ok: true, value: result.value, error: '' }
+        : { robotId: robot.id, id: action.id, ok: false, value: null, error: result.error },
+    );
   }
 
   advanceWorld(state);
@@ -217,9 +278,13 @@ function tick(): void {
   renderPanels();
   scheduleSave();
 
-  if (!outcome) return;
-  if (outcome.ok) runner.resolve(outcome.id, outcome.value, snapshot());
-  else runner.reject(outcome.id, outcome.error, snapshot());
+  // Answered last, and only after every robot has moved, so the snapshot each
+  // script wakes up with already contains what its neighbours did this tick.
+  for (const outcome of outcomes) {
+    const snapshot = snapshotOf(outcome.robotId);
+    if (outcome.ok) fleet.resolve(outcome.robotId, outcome.id, outcome.value, snapshot);
+    else fleet.reject(outcome.robotId, outcome.id, outcome.error, snapshot);
+  }
 }
 
 // Shell ------------------------------------------------------------------------
@@ -370,13 +435,13 @@ const controls = new Controls({
   onPause: () => {
     if (scheduler.isPaused) scheduler.resume();
     else scheduler.pause();
-    controls.update({ running: runner.running, paused: scheduler.isPaused });
+    controls.update({ running: fleet.running, paused: scheduler.isPaused });
   },
   onStop: () => stopScript(),
   onReset: () => {
     // A script mid-run is holding a promise about a world that is about to change
     // under it, so the honest move is to end the run rather than lie to it.
-    if (runner.running) runner.stop('user');
+    if (fleet.running) fleet.stop('user');
     resetFloor('Floor reset.');
   },
   onCode: () => codePanel.toggle(),
@@ -390,11 +455,22 @@ const accountButton = controls.addButton('Sign in', 'Keep this factory across br
 );
 
 /**
+ * Empties the queue and tells every script that was waiting on it why. Silence
+ * would be worse than an error: a robot awaiting an answer that never comes does
+ * not even trip the watchdog, because as far as it knows it is waiting on us.
+ */
+function dropQueued(message: string): void {
+  for (const action of queue.drain()) {
+    fleet.reject(action.robotId, action.id, message, snapshotOf(action.robotId));
+  }
+}
+
+/**
  * Back to the opening floor, keeping everything the player earned. Whatever was
  * queued belongs to the old world and goes with it.
  */
 function resetFloor(note: string): void {
-  queue.clear();
+  dropQueued('The floor was reset while this action was waiting.');
   resetWorld(state);
   worldView.sync(state);
   worldView.snapRobots();
@@ -585,7 +661,7 @@ async function syncNow(): Promise<void> {
  * and a swap would leave half the game looking at the old world.
  */
 function adoptCloudSave(next: GameState): void {
-  if (runner.running) runner.stop('user');
+  if (fleet.running) fleet.stop('user');
   queue.clear();
 
   Object.assign(state, next);
@@ -611,9 +687,19 @@ if (isCloudConfigured()) void restoreAccount();
 
 function runScript(): void {
   queue.clear();
-  codePanel.editor.setRunningLine(null);
+  runningLines.clear();
+  codePanel.editor.setRunningLines([]);
+  lineNumbersReported = false;
   codePanel.console.system('Run started.');
-  runner.start(codePanel.editor.value, unlockedCommands(state), snapshot());
+
+  // Every robot gets the same source and its own worker. Which one it is arrives
+  // in the snapshot, because it cannot be read off a script they all share.
+  const members = state.robots.map((robot) => ({
+    robotId: robot.id,
+    snapshot: snapshotOf(robot.id),
+  }));
+
+  fleet.start(members, codePanel.editor.value, unlockedCommands(state));
   scheduler.setTickRate(state.tickRateMs);
   scheduler.start();
   controls.update({ running: true, paused: false });
@@ -623,12 +709,12 @@ function runScript(): void {
 }
 
 function stopScript(): void {
-  if (!runner.running) {
+  if (!fleet.running) {
     scheduler.stop();
     controls.update({ running: false, paused: false });
     return;
   }
-  runner.stop('user');
+  fleet.stop('user');
 }
 
 // Hover ------------------------------------------------------------------------

@@ -144,6 +144,8 @@ function probeCommand(names: string[]): string | null {
 // Running ---------------------------------------------------------------------
 
 const EMPTY_SNAPSHOT: StateSnapshot = {
+  robotId: '',
+  index: 0,
   x: 0,
   y: 0,
   facing: 'south',

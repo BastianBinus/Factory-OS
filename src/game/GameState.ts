@@ -157,7 +157,10 @@ export function getRobot(state: GameState, id: string): Robot | undefined {
   return state.robots.find((robot) => robot.id === id);
 }
 
-/** The robot a script controls when it does not name one. */
+/**
+ * The robot that speaks for the fleet where exactly one may act: it is the only
+ * one allowed to reset the floor. Every other job now names its robot.
+ */
 export function primaryRobot(state: GameState): Robot | undefined {
   return state.robots[0];
 }

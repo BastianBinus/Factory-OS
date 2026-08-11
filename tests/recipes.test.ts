@@ -17,15 +17,29 @@ describe('recipe table', () => {
     }
   });
 
+  function inputValueOf(recipe: (typeof RECIPES)[number]): number {
+    return Object.entries(recipe.inputs).reduce(
+      (sum, [id, amount]) => sum + RESOURCES[id as keyof typeof RESOURCES].sellPrice * amount,
+      0,
+    );
+  }
+
   it('is worth crafting — output sells for more than the inputs', () => {
     for (const recipe of RECIPES) {
-      const inputValue = Object.entries(recipe.inputs).reduce(
-        (sum, [id, amount]) => sum + RESOURCES[id as keyof typeof RESOURCES].sellPrice * amount,
-        0,
-      );
+      // The seed crystal is the one thing here that is made to be used, not
+      // sold, so it is held to the weaker rule in the next test instead.
+      if (recipe.output === 'seed_crystal') continue;
       const outputValue = RESOURCES[recipe.output].sellPrice * recipe.outputAmount;
-      expect(outputValue).toBeGreaterThan(inputValue);
+      expect(outputValue, recipe.id).toBeGreaterThan(inputValueOf(recipe));
     }
+  });
+
+  it('prices the seed crystal at exactly what it cost to make', () => {
+    const recipe = getRecipe('craft_seed_crystal');
+    expect(recipe).toBeDefined();
+    // Not a profit and not a trap: a player who crafts a crystal and changes
+    // their mind gets their ore back at face value.
+    expect(RESOURCES.seed_crystal.sellPrice * recipe!.outputAmount).toBe(inputValueOf(recipe!));
   });
 
   it('costs time', () => {
@@ -67,5 +81,26 @@ describe('findRunnableRecipe', () => {
     expect(findRunnableRecipe('assembler', { iron_ingot: 2, copper_ingot: 1 })?.id).toBe(
       'assemble_gear',
     );
+  });
+});
+
+describe('the seeder', () => {
+  it('turns two iron ore into one seed crystal', () => {
+    const recipe = getRecipe('craft_seed_crystal');
+    expect(recipe).toMatchObject({
+      machine: 'seeder',
+      inputs: { iron_ore: 2 },
+      output: 'seed_crystal',
+      outputAmount: 1,
+    });
+  });
+
+  it('is the only thing the seeder makes', () => {
+    expect(recipesFor('seeder').map((recipe) => recipe.id)).toEqual(['craft_seed_crystal']);
+  });
+
+  it('runs on ore alone, so a field can be grown without the smelter', () => {
+    expect(findRunnableRecipe('seeder', { iron_ore: 2 })?.id).toBe('craft_seed_crystal');
+    expect(findRunnableRecipe('seeder', { iron_ore: 1 })).toBeUndefined();
   });
 });

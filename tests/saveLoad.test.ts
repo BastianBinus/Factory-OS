@@ -143,7 +143,6 @@ describe('migration', () => {
     expect(result.state.version).toBe(SAVE_VERSION);
     expect(result.state.tickRateMs).toBe(400);
     expect(result.state.inventoryCapacity).toBe(10);
-    expect(result.state.oreRegrowTicks).toBe(30);
     expect(result.state.seenConcepts).toEqual([]);
   });
 
@@ -201,5 +200,88 @@ describe('the tutorial step', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.state.onboardingStep).toBe(ONBOARDING_DONE);
+  });
+});
+
+describe('the cultivation migration', () => {
+  /** A save exactly as version 1 wrote them: ore nodes, floor, oreRegrowTicks. */
+  function version1Save(size: number): Record<string, unknown> {
+    const data = savedState();
+    data['version'] = 1;
+    data['oreRegrowTicks'] = 30;
+    data['grid'] = {
+      width: size,
+      height: size,
+      tiles: Array.from({ length: size * size }, () => ({
+        kind: 'ore',
+        resource: 'iron_ore',
+        amount: 20,
+        regrowAt: null,
+      })),
+    };
+    return data;
+  }
+
+  it('rebuilds the factory floor when a save predates cultivation', () => {
+    const result = deserialize(JSON.stringify(version1Save(12)));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.migratedFrom).toBe(1);
+
+    const grid = result.state.grid;
+    expect(grid.width).toBe(12);
+    expect(grid.tiles).toHaveLength(144);
+
+    // Phrased as an absence rather than a count, so that deleting the ore tile
+    // type in Task 12 leaves this assertion saying exactly what it says now.
+    expect(grid.tiles.map((tile) => tile.kind)).not.toContain('ore');
+
+    // The floor has to come back whole: three machines, a market, and something
+    // ripe to harvest. A grid of bare raw ground would be a save nobody can play.
+    expect(grid.tiles.filter((tile) => tile.kind === 'machine')).toHaveLength(3);
+    expect(grid.tiles.filter((tile) => tile.kind === 'market')).toHaveLength(1);
+    expect(
+      grid.tiles.filter((tile) => tile.kind === 'ground' && tile.state === 'ripe'),
+    ).toHaveLength(3);
+  });
+
+  it('keeps the grid at the size the player paid for', () => {
+    const result = deserialize(JSON.stringify(version1Save(8)));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.grid.width).toBe(8);
+    expect(result.state.grid.tiles).toHaveLength(64);
+  });
+
+  it('takes the floor and nothing else', () => {
+    const data = version1Save(8);
+    data['credits'] = 4200;
+    data['unlocks'] = ['move', 'mine', 'print', 'sell'];
+    data['completedMissions'] = ['m1_move'];
+    data['stats'] = {
+      tilesMoved: 40,
+      oreMined: 25,
+      creditsEarned: 900,
+      itemsSold: 12,
+      crafted: { gear: 2 },
+    };
+
+    const result = deserialize(JSON.stringify(data));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.credits).toBe(4200);
+    expect(result.state.completedMissions).toEqual(['m1_move']);
+    expect(result.state.stats.crafted).toEqual({ gear: 2 });
+  });
+
+  it('leaves a save written by this build alone', () => {
+    const result = deserialize(serialize(createInitialState()));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.migratedFrom).toBeUndefined();
   });
 });

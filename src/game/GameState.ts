@@ -2,7 +2,7 @@ import type { GameState, Grid, GroundTile, ResourceId, Robot, Tile, UnlockId } f
 import { expandGrid } from './grid';
 import { BASE_YIELD, purityFor } from './cultivation';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export const ORE_NODE_AMOUNT = 20;
 export const DEFAULT_TICK_RATE_MS = 400;

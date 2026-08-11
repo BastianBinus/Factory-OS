@@ -3,6 +3,7 @@ import type {
   CommandResult,
   Direction,
   GameState,
+  GroundTile,
   Inventory,
   MachineTile,
   Robot,
@@ -136,6 +137,9 @@ export function seed(ctx: CommandContext, resource: unknown): CommandResult {
 export function mine(ctx: CommandContext): CommandResult {
   const tile = currentTile(ctx);
 
+  if (tile?.kind === 'ground') return harvest(ctx, tile);
+
+  // --- The ore path. Removed in Task 12 together with the ore tile itself. ---
   if (!tile || tile.kind !== 'ore') {
     return fail('nothing_here', 'There is no ore on this tile.');
   }
@@ -155,6 +159,48 @@ export function mine(ctx: CommandContext): CommandResult {
   }
 
   return ok(tile.resource, `mined ${tile.resource}`);
+}
+
+/**
+ * A ripe tile is emptied in a single tick. That is the whole reward for planning
+ * ahead: the waiting happened while the robot was somewhere else being useful,
+ * and collecting it costs the same one tick as walking a step.
+ *
+ * The seed crystal that comes with it is what makes replanting the same tile
+ * free. Growing the *field* still costs crystals, which have to be crafted.
+ */
+function harvest(ctx: CommandContext, tile: GroundTile): CommandResult {
+  if (tile.state === 'growing') {
+    const ticks = tile.ripeAt === null ? 0 : Math.max(0, tile.ripeAt - ctx.state.tick);
+    return fail('not_ready', `This crop is still growing — ${ticks} ticks to go.`);
+  }
+  if (tile.state !== 'ripe' || tile.resource === null) {
+    return fail(
+      'nothing_here',
+      'There is nothing to harvest here. Use clear() and then seed() to plant something.',
+    );
+  }
+
+  const haul = tile.yield;
+  if (freeCapacity(ctx) < haul + 1) {
+    return fail(
+      'inventory_full',
+      `A harvest is ${haul} ${tile.resource} plus 1 seed crystal, and the robot has room for ${freeCapacity(ctx)}.`,
+    );
+  }
+
+  const resource = tile.resource;
+  addItems(ctx.robot.inventory, resource, haul);
+  addItems(ctx.robot.inventory, 'seed_crystal', 1);
+  ctx.state.stats.oreMined += haul;
+
+  tile.state = 'raw';
+  tile.resource = null;
+  tile.ripeAt = null;
+  tile.yield = 0;
+  tile.purity = 0;
+
+  return ok(resource, `harvested ${haul} ${resource} and 1 seed crystal`);
 }
 
 export function drop(ctx: CommandContext): CommandResult {

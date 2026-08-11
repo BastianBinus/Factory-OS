@@ -11,7 +11,7 @@ import {
 } from '../src/game/cultivation';
 import { setTile } from '../src/game/grid';
 import { createInitialState } from '../src/game/GameState';
-import { clear, seed } from '../src/engine/commands';
+import { clear, mine, seed } from '../src/engine/commands';
 import { expectFail, expectOk, idle, runTick, stateFromLayout } from './helpers';
 
 function ground(state: GroundTile['state'], resource: ResourceId | null = null): GroundTile {
@@ -271,5 +271,83 @@ describe('ripening inside advanceWorld', () => {
 
     expect(state.grid.tiles[0]).toMatchObject({ state: 'raw' });
     expect(state.grid.tiles[1]).toMatchObject({ state: 'prepared' });
+  });
+});
+
+describe('mine on cultivated ground', () => {
+  function ripeState(tile: Partial<GroundTile> = {}): GameState {
+    const state = createInitialState();
+    state.grid = bareGrid(3, 3);
+    setTile(state.grid, 1, 1, { ...ground('ripe', 'iron_ore'), yield: 3, purity: 4, ...tile });
+    state.robots[0]!.x = 1;
+    state.robots[0]!.y = 1;
+    state.robots[0]!.inventory = {};
+    return state;
+  }
+
+  it('hands over the whole yield in one tick, plus a seed crystal', () => {
+    const state = ripeState();
+
+    const result = expectOk(runTick(state, mine));
+
+    expect(result.value).toBe('iron_ore');
+    expect(state.robots[0]!.inventory).toEqual({ iron_ore: 3, seed_crystal: 1 });
+    expect(state.stats.oreMined).toBe(3);
+  });
+
+  it('pays the yield the tile was seeded with, not a fixed number', () => {
+    const state = ripeState({ yield: 6 });
+
+    expectOk(runTick(state, mine));
+
+    expect(state.robots[0]!.inventory).toEqual({ iron_ore: 6, seed_crystal: 1 });
+  });
+
+  /*
+   * The crystal is what makes replanting free. If a harvest could arrive without
+   * one because the robot happened to be nearly full, the player would lose a
+   * crystal to a rounding rule they never see — so a harvest is all or nothing.
+   */
+  it('refuses the harvest unless there is room for the crystal too', () => {
+    const state = ripeState();
+    state.inventoryCapacity = 3;
+
+    const result = expectFail(runTick(state, mine));
+
+    expect(result.code).toBe('inventory_full');
+    expect(state.robots[0]!.inventory).toEqual({});
+    expect(state.grid.tiles[4]).toMatchObject({ state: 'ripe' });
+  });
+
+  it('leaves the tile raw, so the cycle has to start again', () => {
+    const state = ripeState();
+
+    expectOk(runTick(state, mine));
+
+    expect(state.grid.tiles[4]).toEqual({
+      kind: 'ground',
+      state: 'raw',
+      resource: null,
+      ripeAt: null,
+      yield: 0,
+      purity: 0,
+    });
+  });
+
+  it('says the crop is not ready while it is still growing', () => {
+    const state = ripeState({ state: 'growing', ripeAt: 99 });
+
+    const result = expectFail(runTick(state, mine));
+
+    expect(result.code).toBe('not_ready');
+    expect(result.error).toContain('growing');
+  });
+
+  it('says there is nothing there on raw and prepared ground', () => {
+    const raw = ripeState({ state: 'raw', resource: null });
+    expect(expectFail(runTick(raw, mine)).code).toBe('nothing_here');
+
+    const prepared = ripeState({ state: 'prepared', resource: null });
+    expect(expectFail(runTick(prepared, mine)).code).toBe('nothing_here');
   });
 });

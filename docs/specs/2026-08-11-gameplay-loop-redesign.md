@@ -76,7 +76,8 @@ export interface GroundTile {
 }
 ```
 
-`MachineTile` and `MarketTile` are unchanged.
+`MachineTile` and `MarketTile` are unchanged in shape. `MachineId` gains `'seeder'` in 10a, then
+`'refinery'` and `'press'` in 10d.
 
 ### Verbs
 

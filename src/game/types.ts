@@ -42,19 +42,6 @@ export interface GroundTile {
   purity: number;
 }
 
-export interface FloorTile {
-  kind: 'floor';
-}
-
-export interface OreTile {
-  kind: 'ore';
-  resource: ResourceId;
-  /** Units left in this node. Zero means depleted and waiting to regrow. */
-  amount: number;
-  /** Tick at which a depleted node refills, or null while it still has ore. */
-  regrowAt: number | null;
-}
-
 export interface MachineJob {
   recipeId: string;
   readyAt: number;
@@ -72,7 +59,7 @@ export interface MarketTile {
   kind: 'market';
 }
 
-export type Tile = GroundTile | FloorTile | OreTile | MachineTile | MarketTile;
+export type Tile = GroundTile | MachineTile | MarketTile;
 
 export interface Robot {
   id: string;
@@ -211,7 +198,6 @@ export interface GameState {
   /** Milliseconds per tick. Lowered by upgrades, never by a speed slider. */
   tickRateMs: number;
   inventoryCapacity: number;
-  oreRegrowTicks: number;
 }
 
 export type CommandErrorCode =

@@ -15,17 +15,15 @@ import {
   Vector2,
 } from 'three';
 import type { GameState, Grid, MachineId, Robot, Tile } from '../game/types';
-import { ORE_NODE_AMOUNT } from '../game/GameState';
 import { indexOf, tileAt } from '../game/grid';
 import type { WorldPalette } from './palette';
-import type { GroundView, MachineView, OreView } from './meshFactory';
+import type { GroundView, MachineView } from './meshFactory';
 import {
   WorldGeometry,
   WorldMaterials,
   createGround,
   createMachine,
   createMarket,
-  createOre,
   createRobot,
 } from './meshFactory';
 import type { Scene } from './Scene';
@@ -47,7 +45,6 @@ export interface HoverInfo {
 
 interface TileView {
   ground?: GroundView;
-  ore?: OreView;
   machine?: MachineView;
   group: Group;
 }
@@ -203,10 +200,6 @@ export class WorldView {
         const ground = createGround(this.geometry, this.materials);
         return { ground, group: ground.group };
       }
-      case 'ore': {
-        const ore = createOre(this.geometry, this.materials, tile.resource);
-        return { ore, group: ore.group };
-      }
       case 'machine': {
         const machine = createMachine(this.geometry, this.materials, tile.machine);
         return { machine, group: machine.group };
@@ -223,7 +216,6 @@ export class WorldView {
       const tile = state.grid.tiles[index];
       if (!tile) continue;
       if (tile.kind === 'ground') view.ground?.setState(tile.state, tile.resource);
-      if (tile.kind === 'ore') view.ore?.setFill(tile.amount / ORE_NODE_AMOUNT);
       if (tile.kind === 'machine') view.machine?.setBusy(tile.job !== null);
     }
   }
@@ -466,7 +458,6 @@ function gridSignature(grid: Grid): string {
   const kinds = grid.tiles
     .map((tile) => {
       if (tile.kind === 'ground') return '.';
-      if (tile.kind === 'ore') return tile.resource === 'iron_ore' ? 'i' : 'c';
       if (tile.kind === 'machine') return MACHINE_MARK[tile.machine];
       return tile.kind === 'market' ? 'm' : '.';
     })

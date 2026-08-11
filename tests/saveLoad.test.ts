@@ -132,7 +132,6 @@ describe('migration', () => {
     delete data['version'];
     delete data['tickRateMs'];
     delete data['inventoryCapacity'];
-    delete data['oreRegrowTicks'];
     delete data['seenConcepts'];
 
     const result = deserialize(JSON.stringify(data));

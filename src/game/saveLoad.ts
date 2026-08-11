@@ -1,7 +1,6 @@
 import type { GameState } from './types';
 import {
   DEFAULT_CAPACITY,
-  DEFAULT_REGROW_TICKS,
   DEFAULT_TICK_RATE_MS,
   INITIAL_LAYOUT,
   ONBOARDING_DONE,
@@ -44,7 +43,6 @@ const MIGRATIONS: Record<number, Migration> = {
     ...data,
     tickRateMs: data['tickRateMs'] ?? DEFAULT_TICK_RATE_MS,
     inventoryCapacity: data['inventoryCapacity'] ?? DEFAULT_CAPACITY,
-    oreRegrowTicks: data['oreRegrowTicks'] ?? DEFAULT_REGROW_TICKS,
     seenConcepts: data['seenConcepts'] ?? [],
     completedMissions: data['completedMissions'] ?? [],
     unlocks: data['unlocks'] ?? [...STARTING_UNLOCKS],

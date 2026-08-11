@@ -194,40 +194,6 @@ const ORE_CHUNKS = [
   { x: -0.14, z: 0.18, scale: 0.66, rotation: -0.3 },
 ] as const;
 
-export interface OreView {
-  group: Group;
-  /** Shows fewer chunks as the node empties; hides the last one at zero. */
-  setFill(ratio: number): void;
-}
-
-export function createOre(
-  geometry: WorldGeometry,
-  materials: WorldMaterials,
-  resource: ResourceId,
-): OreView {
-  const group = new Group();
-  const chunks: Mesh[] = [];
-
-  for (const chunk of ORE_CHUNKS) {
-    const mesh = solid(geometry.oreChunk, materials.ore[resource]);
-    mesh.position.set(chunk.x, 0, chunk.z);
-    mesh.rotation.y = chunk.rotation;
-    mesh.scale.setScalar(chunk.scale);
-    group.add(mesh);
-    chunks.push(mesh);
-  }
-
-  return {
-    group,
-    setFill(ratio) {
-      const visible = Math.ceil(Math.max(0, Math.min(1, ratio)) * chunks.length);
-      chunks.forEach((mesh, index) => {
-        mesh.visible = index < visible;
-      });
-    },
-  };
-}
-
 export interface GroundView {
   group: Group;
   /** Redraws for the tile's current state. Only toggles and rescales — no allocation. */

@@ -9,7 +9,7 @@ import type {
   Robot,
   Tile,
 } from '../game/types';
-import { inBounds, isDirection, regrowOre, step, tileAt } from '../game/grid';
+import { inBounds, isDirection, step, tileAt } from '../game/grid';
 import {
   RESOURCE_IDS,
   addItems,
@@ -22,7 +22,6 @@ import {
 } from '../game/resources';
 import { findRunnableRecipe, getRecipe, recipesFor } from '../game/recipes';
 import { sellAll } from '../game/economy';
-import { ORE_NODE_AMOUNT } from '../game/GameState';
 import { GROW_TICKS, isSeedable, purityFor, ripen, yieldFor } from '../game/cultivation';
 
 /**
@@ -136,29 +135,8 @@ export function seed(ctx: CommandContext, resource: unknown): CommandResult {
 
 export function mine(ctx: CommandContext): CommandResult {
   const tile = currentTile(ctx);
-
   if (tile?.kind === 'ground') return harvest(ctx, tile);
-
-  // --- The ore path. Removed in Task 12 together with the ore tile itself. ---
-  if (!tile || tile.kind !== 'ore') {
-    return fail('nothing_here', 'There is no ore on this tile.');
-  }
-  if (tile.amount <= 0) {
-    return fail('depleted', 'This ore node is empty and still regrowing.');
-  }
-  if (freeCapacity(ctx) <= 0) {
-    return fail('inventory_full', `The robot is carrying ${totalItems(ctx.robot.inventory)} items and cannot hold more.`);
-  }
-
-  tile.amount -= 1;
-  addItems(ctx.robot.inventory, tile.resource, 1);
-  ctx.state.stats.oreMined += 1;
-
-  if (tile.amount === 0) {
-    tile.regrowAt = ctx.state.tick + ctx.state.oreRegrowTicks;
-  }
-
-  return ok(tile.resource, `mined ${tile.resource}`);
+  return fail('nothing_here', 'The robot is not standing on ground it can harvest.');
 }
 
 /**
@@ -361,8 +339,6 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
         yield: tile.yield,
         purity: tile.purity,
       };
-    case 'ore':
-      return { type: 'ore', x, y, resource: tile.resource, amount: tile.amount };
     case 'machine':
       return {
         type: 'machine',
@@ -377,13 +353,13 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
     case 'market':
       return { type: 'market', x, y };
     default:
-      return { type: 'floor', x, y };
+      return { type: 'unknown', x, y };
   }
 }
 
 /**
  * World simulation that runs once per tick, independent of what any robot does:
- * machines finish their jobs and depleted ore nodes refill.
+ * machines finish their jobs and crops that have had their time turn ripe.
  */
 export function advanceWorld(state: GameState): void {
   for (const tile of state.grid.tiles) {
@@ -398,6 +374,5 @@ export function advanceWorld(state: GameState): void {
     tile.job = null;
   }
 
-  regrowOre(state.grid, state.tick, ORE_NODE_AMOUNT);
   ripen(state);
 }

@@ -4,10 +4,8 @@ import { BASE_YIELD, purityFor } from './cultivation';
 
 export const SAVE_VERSION = 2;
 
-export const ORE_NODE_AMOUNT = 20;
 export const DEFAULT_TICK_RATE_MS = 400;
 export const DEFAULT_CAPACITY = 10;
-export const DEFAULT_REGROW_TICKS = 30;
 
 export const STARTING_UNLOCKS: UnlockId[] = ['move', 'mine', 'print', 'scan', 'cultivate'];
 
@@ -177,7 +175,6 @@ export function createInitialState(): GameState {
     script: STARTER_SCRIPT,
     tickRateMs: DEFAULT_TICK_RATE_MS,
     inventoryCapacity: DEFAULT_CAPACITY,
-    oreRegrowTicks: DEFAULT_REGROW_TICKS,
   };
 }
 

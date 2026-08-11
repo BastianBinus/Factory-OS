@@ -735,14 +735,12 @@ function describeHoveredTile(info: HoverInfo): string {
   switch (tile.kind) {
     case 'ground':
       return describeGround(tile);
-    case 'ore':
-      return `${tile.resource} (${tile.amount})`;
     case 'machine':
       return tile.job === null ? tile.machine : `${tile.machine}, running`;
     case 'market':
       return 'market';
     default:
-      return 'floor';
+      return 'unknown tile';
   }
 }
 

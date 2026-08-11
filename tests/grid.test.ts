@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Grid, OreTile } from '../src/game/types';
+import type { Grid } from '../src/game/types';
 import {
   DIRECTION_VECTORS,
   expandGrid,
@@ -7,7 +7,6 @@ import {
   inBounds,
   indexOf,
   isDirection,
-  regrowOre,
   setTile,
   step,
   tileAt,
@@ -75,32 +74,6 @@ describe('bounds and indexing', () => {
     expect(seen).toHaveLength(12);
     expect(seen[0]).toBe('0,0');
     expect(seen[11]).toBe('3,2');
-  });
-});
-
-describe('ore regrowth', () => {
-  it('refills only nodes whose regrow tick has arrived', () => {
-    const grid = emptyGrid(2, 1);
-    const early: OreTile = { kind: 'ore', resource: 'iron_ore', amount: 0, regrowAt: 10 };
-    const late: OreTile = { kind: 'ore', resource: 'iron_ore', amount: 0, regrowAt: 40 };
-    setTile(grid, 0, 0, early);
-    setTile(grid, 1, 0, late);
-
-    const regrown = regrowOre(grid, 10, 20);
-
-    expect(regrown).toHaveLength(1);
-    expect(early.amount).toBe(20);
-    expect(early.regrowAt).toBeNull();
-    expect(late.amount).toBe(0);
-  });
-
-  it('leaves nodes that still hold ore alone', () => {
-    const grid = emptyGrid(1, 1);
-    const tile: OreTile = { kind: 'ore', resource: 'iron_ore', amount: 5, regrowAt: null };
-    setTile(grid, 0, 0, tile);
-
-    expect(regrowOre(grid, 999, 20)).toHaveLength(0);
-    expect(tile.amount).toBe(5);
   });
 });
 

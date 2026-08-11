@@ -11,6 +11,8 @@ import {
 } from '../src/game/cultivation';
 import { setTile } from '../src/game/grid';
 import { createInitialState } from '../src/game/GameState';
+import { clear, seed } from '../src/engine/commands';
+import { expectFail, expectOk, runTick, stateFromLayout } from './helpers';
 
 function ground(state: GroundTile['state'], resource: ResourceId | null = null): GroundTile {
   return { kind: 'ground', state, resource, ripeAt: null, yield: 0, purity: 0 };
@@ -127,5 +129,112 @@ describe('ripen', () => {
     setTile(grid, 2, 0, { ...ground('ripe', 'iron_ore'), yield: 3 });
 
     expect(ripen(stateWith(grid, 9999))).toHaveLength(0);
+  });
+});
+
+describe('clear', () => {
+  it('turns raw ground into prepared ground', () => {
+    const state = createInitialState();
+    state.grid = bareGrid(3, 3);
+    state.robots[0]!.x = 1;
+    state.robots[0]!.y = 1;
+
+    expectOk(runTick(state, clear));
+
+    expect(state.grid.tiles[4]).toMatchObject({ kind: 'ground', state: 'prepared' });
+  });
+
+  it('refuses ground that is already prepared', () => {
+    const state = createInitialState();
+    state.grid = bareGrid(1, 1);
+    state.robots[0]!.x = 0;
+    state.robots[0]!.y = 0;
+
+    expectOk(runTick(state, clear));
+    const result = expectFail(runTick(state, clear));
+
+    expect(result.code).toBe('bad_argument');
+    expect(result.error).toContain('prepared');
+  });
+
+  it('refuses a tile that is not ground at all', () => {
+    const state = stateFromLayout(['M'], 0, 0);
+    expect(expectFail(runTick(state, clear)).code).toBe('nothing_here');
+  });
+});
+
+describe('seed', () => {
+  function preparedState(): GameState {
+    const state = createInitialState();
+    state.grid = bareGrid(3, 3);
+    state.robots[0]!.x = 1;
+    state.robots[0]!.y = 1;
+    state.robots[0]!.inventory = { seed_crystal: 1 };
+    expectOk(runTick(state, clear));
+    return state;
+  }
+
+  it('plants a crop, spends the crystal and books the ripe tick', () => {
+    const state = preparedState();
+
+    expectOk(runTick(state, (ctx) => seed(ctx, 'iron_ore')));
+
+    expect(state.grid.tiles[4]).toMatchObject({
+      kind: 'ground',
+      state: 'growing',
+      resource: 'iron_ore',
+      ripeAt: state.tick + (GROW_TICKS.iron_ore ?? 0),
+      yield: BASE_YIELD,
+    });
+    expect(state.robots[0]!.inventory.seed_crystal).toBeUndefined();
+  });
+
+  it('gives the tile a purity so the sorting bay has something to sort', () => {
+    const state = preparedState();
+    expectOk(runTick(state, (ctx) => seed(ctx, 'copper_ore')));
+
+    const tile = state.grid.tiles[4] as GroundTile;
+    expect(tile.purity).toBe(purityFor(1, 1, state.tick));
+  });
+
+  it('will not plant on raw ground', () => {
+    const state = createInitialState();
+    state.grid = bareGrid(1, 1);
+    state.robots[0]!.x = 0;
+    state.robots[0]!.y = 0;
+    state.robots[0]!.inventory = { seed_crystal: 1 };
+
+    const result = expectFail(runTick(state, (ctx) => seed(ctx, 'iron_ore')));
+
+    expect(result.code).toBe('bad_argument');
+    expect(result.error).toContain('cleared');
+  });
+
+  it('refuses a resource that cannot be grown', () => {
+    const state = preparedState();
+    const result = expectFail(runTick(state, (ctx) => seed(ctx, 'gear')));
+
+    expect(result.code).toBe('bad_argument');
+    expect(result.error).toContain('iron_ore');
+  });
+
+  it('refuses when the robot has no crystal, and says where to get one', () => {
+    const state = preparedState();
+    state.robots[0]!.inventory = {};
+
+    const result = expectFail(runTick(state, (ctx) => seed(ctx, 'iron_ore')));
+
+    expect(result.code).toBe('missing_input');
+    expect(result.error).toContain('seeder');
+  });
+
+  it('pays the adjacency bonus at seeding time', () => {
+    const state = preparedState();
+    setTile(state.grid, 1, 0, { ...ground('ripe', 'iron_ore'), yield: 3 });
+    setTile(state.grid, 0, 1, { ...ground('growing', 'iron_ore'), ripeAt: 99 });
+
+    expectOk(runTick(state, (ctx) => seed(ctx, 'iron_ore')));
+
+    expect((state.grid.tiles[4] as GroundTile).yield).toBe(BASE_YIELD + 2);
   });
 });

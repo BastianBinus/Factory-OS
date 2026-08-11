@@ -15,12 +15,14 @@ import {
   cloneInventory,
   describeInventory,
   isEmpty,
+  isResourceId,
   removeItems,
   totalItems,
 } from '../game/resources';
 import { findRunnableRecipe, getRecipe, recipesFor } from '../game/recipes';
 import { sellAll } from '../game/economy';
 import { ORE_NODE_AMOUNT } from '../game/GameState';
+import { GROW_TICKS, isSeedable, purityFor, yieldFor } from '../game/cultivation';
 
 /**
  * Every command costs exactly one tick and mutates `state` in place. They import
@@ -74,6 +76,61 @@ export function move(ctx: CommandContext, direction: unknown): CommandResult {
   ctx.state.stats.tilesMoved += 1;
 
   return ok(null, `moved ${direction} to ${target.x},${target.y}`);
+}
+
+export function clear(ctx: CommandContext): CommandResult {
+  const tile = currentTile(ctx);
+
+  if (!tile || tile.kind !== 'ground') {
+    return fail('nothing_here', 'clear() only works on open ground.');
+  }
+  if (tile.state !== 'raw') {
+    return fail('bad_argument', `This ground is already ${tile.state}.`);
+  }
+
+  tile.state = 'prepared';
+
+  return ok(null, 'cleared the ground');
+}
+
+export function seed(ctx: CommandContext, resource: unknown): CommandResult {
+  const tile = currentTile(ctx);
+
+  if (!tile || tile.kind !== 'ground') {
+    return fail('nothing_here', 'seed() only works on open ground.');
+  }
+  if (tile.state !== 'prepared') {
+    return fail(
+      'bad_argument',
+      tile.state === 'raw'
+        ? 'This ground has to be cleared before it can be seeded.'
+        : `This ground is already ${tile.state}.`,
+    );
+  }
+  if (!isResourceId(resource) || !isSeedable(resource)) {
+    return fail(
+      'bad_argument',
+      `seed() needs 'iron_ore' or 'copper_ore' — got ${JSON.stringify(resource)}.`,
+    );
+  }
+  if ((ctx.robot.inventory['seed_crystal'] ?? 0) < 1) {
+    return fail(
+      'missing_input',
+      'The robot has no seed crystal. The seeder makes one from 2 iron ore.',
+    );
+  }
+
+  removeItems(ctx.robot.inventory, 'seed_crystal', 1);
+
+  tile.state = 'growing';
+  tile.resource = resource;
+  tile.ripeAt = ctx.state.tick + (GROW_TICKS[resource] ?? 0);
+  // Both are settled now rather than at harvest, so a player can read a field
+  // and know what it is worth before waiting for it.
+  tile.yield = yieldFor(ctx.state.grid, ctx.robot.x, ctx.robot.y, resource);
+  tile.purity = purityFor(ctx.robot.x, ctx.robot.y, ctx.state.tick);
+
+  return ok(resource, `seeded ${resource}`);
 }
 
 export function mine(ctx: CommandContext): CommandResult {

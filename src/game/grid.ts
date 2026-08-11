@@ -63,47 +63,27 @@ export function regrowOre(grid: Grid, tick: number, amount: number): OreTile[] {
   return regrown;
 }
 
-/** Deterministic PRNG so an expanded grid looks the same on every machine and in tests. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /**
  * Grows the factory floor to the south-east, keeping every existing tile at its
- * old coordinates so running scripts do not break. New ground gets a scattering
- * of ore nodes.
+ * old coordinates so running scripts do not break.
+ *
+ * New land is raw ground and nothing else. Scattering free resources across it
+ * would make buying land the reward, when the reward is meant to be the space to
+ * plant more — which still has to be cleared, seeded and waited for.
  */
-export function expandGrid(grid: Grid, size: number, oreAmount: number): Grid {
+export function expandGrid(grid: Grid, size: number): Grid {
   if (size <= grid.width && size <= grid.height) return grid;
 
   const width = Math.max(size, grid.width);
   const height = Math.max(size, grid.height);
-  const random = mulberry32(width * 1000 + height);
   const tiles: Tile[] = [];
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const existing = tileAt(grid, x, y);
-      if (existing) {
-        tiles.push(existing);
-        continue;
-      }
-      if (random() < 0.09) {
-        tiles.push({
-          kind: 'ore',
-          resource: random() < 0.6 ? 'iron_ore' : 'copper_ore',
-          amount: oreAmount,
-          regrowAt: null,
-        });
-      } else {
-        tiles.push({ kind: 'floor' });
-      }
+      tiles.push(
+        existing ?? { kind: 'ground', state: 'raw', resource: null, ripeAt: null, yield: 0, purity: 0 },
+      );
     }
   }
 

@@ -1,5 +1,5 @@
 import type { GameState, MissionDef, MissionId, UnlockDef, UnlockId } from './types';
-import { ORE_NODE_AMOUNT, createRobot, grantUnlock, hasUnlock } from './GameState';
+import { createRobot, grantUnlock, hasUnlock } from './GameState';
 import { expandGrid, forEachTile } from './grid';
 import { spend } from './economy';
 
@@ -24,7 +24,7 @@ export const UNLOCKS: UnlockDef[] = [
   {
     id: 'mine',
     label: 'mine()',
-    description: 'Take one unit of ore from the tile the robot stands on.',
+    description: 'Harvest the ripe crop on the tile the robot stands on.',
     cost: 0,
     commands: ['mine'],
   },
@@ -120,7 +120,7 @@ export const UNLOCKS: UnlockDef[] = [
   {
     id: 'grid_12',
     label: 'Factory floor 12 x 12',
-    description: 'Buy the neighbouring land. More ore nodes appear on it.',
+    description: 'Buy the neighbouring land. It arrives raw — clear it and seed it.',
     cost: 600,
     conceptId: 'arrays',
   },
@@ -402,10 +402,10 @@ export function applyUnlockEffect(state: GameState, id: UnlockId): void {
       state.tickRateMs = Math.min(state.tickRateMs, 120);
       break;
     case 'grid_12':
-      state.grid = expandGrid(state.grid, 12, ORE_NODE_AMOUNT);
+      state.grid = expandGrid(state.grid, 12);
       break;
     case 'grid_16':
-      state.grid = expandGrid(state.grid, 16, ORE_NODE_AMOUNT);
+      state.grid = expandGrid(state.grid, 16);
       break;
     case 'robot_2':
       addRobot(state);

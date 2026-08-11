@@ -22,7 +22,7 @@ import {
 import { findRunnableRecipe, getRecipe, recipesFor } from '../game/recipes';
 import { sellAll } from '../game/economy';
 import { ORE_NODE_AMOUNT } from '../game/GameState';
-import { GROW_TICKS, isSeedable, purityFor, yieldFor } from '../game/cultivation';
+import { GROW_TICKS, isSeedable, purityFor, ripen, yieldFor } from '../game/cultivation';
 
 /**
  * Every command costs exactly one tick and mutates `state` in place. They import
@@ -342,4 +342,5 @@ export function advanceWorld(state: GameState): void {
   }
 
   regrowOre(state.grid, state.tick, ORE_NODE_AMOUNT);
+  ripen(state);
 }

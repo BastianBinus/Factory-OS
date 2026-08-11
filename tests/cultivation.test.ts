@@ -12,7 +12,7 @@ import {
 import { setTile } from '../src/game/grid';
 import { createInitialState } from '../src/game/GameState';
 import { clear, seed } from '../src/engine/commands';
-import { expectFail, expectOk, runTick, stateFromLayout } from './helpers';
+import { expectFail, expectOk, idle, runTick, stateFromLayout } from './helpers';
 
 function ground(state: GroundTile['state'], resource: ResourceId | null = null): GroundTile {
   return { kind: 'ground', state, resource, ripeAt: null, yield: 0, purity: 0 };
@@ -236,5 +236,40 @@ describe('seed', () => {
     expectOk(runTick(state, (ctx) => seed(ctx, 'iron_ore')));
 
     expect((state.grid.tiles[4] as GroundTile).yield).toBe(BASE_YIELD + 2);
+  });
+});
+
+describe('ripening inside advanceWorld', () => {
+  it('turns a crop ripe on the tick it was booked for, not before', () => {
+    const state = createInitialState();
+    state.grid = bareGrid(1, 1);
+    setTile(state.grid, 0, 0, { ...ground('growing', 'iron_ore'), ripeAt: 4, yield: 5 });
+
+    idle(state, 3);
+    expect(state.grid.tiles[0]).toMatchObject({ state: 'growing' });
+
+    idle(state, 1);
+    expect(state.grid.tiles[0]).toMatchObject({ state: 'ripe', ripeAt: null });
+  });
+
+  it('leaves the yield alone, so the harvest pays what seeding promised', () => {
+    const state = createInitialState();
+    state.grid = bareGrid(1, 1);
+    setTile(state.grid, 0, 0, { ...ground('growing', 'copper_ore'), ripeAt: 1, yield: 5, purity: 7 });
+
+    idle(state, 1);
+
+    expect(state.grid.tiles[0]).toMatchObject({ state: 'ripe', yield: 5, purity: 7 });
+  });
+
+  it('does not touch ground that was never seeded', () => {
+    const state = createInitialState();
+    state.grid = bareGrid(2, 1);
+    setTile(state.grid, 1, 0, ground('prepared'));
+
+    idle(state, 50);
+
+    expect(state.grid.tiles[0]).toMatchObject({ state: 'raw' });
+    expect(state.grid.tiles[1]).toMatchObject({ state: 'prepared' });
   });
 });

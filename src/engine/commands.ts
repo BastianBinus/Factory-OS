@@ -350,6 +350,17 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
   if (!tile) return { type: 'void', x, y };
 
   switch (tile.kind) {
+    case 'ground':
+      return {
+        type: 'ground',
+        x,
+        y,
+        state: tile.state,
+        resource: tile.resource,
+        ripeIn: tile.ripeAt === null ? 0 : Math.max(0, tile.ripeAt - state.tick),
+        yield: tile.yield,
+        purity: tile.purity,
+      };
     case 'ore':
       return { type: 'ore', x, y, resource: tile.resource, amount: tile.amount };
     case 'machine':

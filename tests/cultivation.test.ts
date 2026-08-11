@@ -11,8 +11,8 @@ import {
 } from '../src/game/cultivation';
 import { setTile } from '../src/game/grid';
 import { createInitialState } from '../src/game/GameState';
-import { clear, mine, seed } from '../src/engine/commands';
-import { expectFail, expectOk, idle, runTick, stateFromLayout } from './helpers';
+import { clear, mine, scan, seed } from '../src/engine/commands';
+import { ctxOf, expectFail, expectOk, idle, runTick, stateFromLayout } from './helpers';
 
 function ground(state: GroundTile['state'], resource: ResourceId | null = null): GroundTile {
   return { kind: 'ground', state, resource, ripeAt: null, yield: 0, purity: 0 };
@@ -349,5 +349,52 @@ describe('mine on cultivated ground', () => {
 
     const prepared = ripeState({ state: 'prepared', resource: null });
     expect(expectFail(runTick(prepared, mine)).code).toBe('nothing_here');
+  });
+});
+
+describe('scan on cultivated ground', () => {
+  function scanAtOrigin(tile: GroundTile): Record<string, unknown> {
+    const state = createInitialState();
+    state.grid = bareGrid(1, 1);
+    setTile(state.grid, 0, 0, tile);
+    state.robots[0]!.x = 0;
+    state.robots[0]!.y = 0;
+    return expectOk(scan(ctxOf(state))).value as Record<string, unknown>;
+  }
+
+  it('describes raw ground as ground with nothing on it', () => {
+    expect(scanAtOrigin(ground('raw'))).toEqual({
+      type: 'ground',
+      x: 0,
+      y: 0,
+      state: 'raw',
+      resource: null,
+      ripeIn: 0,
+      yield: 0,
+      purity: 0,
+    });
+  });
+
+  /*
+   * ripeIn, not ripeAt. A script that reads an absolute tick has to know the
+   * current tick to do anything with it; a countdown is directly usable.
+   */
+  it('counts down to ripe instead of naming an absolute tick', () => {
+    const state = createInitialState();
+    state.grid = bareGrid(1, 1);
+    setTile(state.grid, 0, 0, { ...ground('growing', 'copper_ore'), ripeAt: 12 });
+    state.robots[0]!.x = 0;
+    state.robots[0]!.y = 0;
+    state.tick = 4;
+
+    const value = expectOk(scan(ctxOf(state))).value as Record<string, unknown>;
+
+    expect(value).toMatchObject({ state: 'growing', resource: 'copper_ore', ripeIn: 8 });
+  });
+
+  it('reports the yield and purity a ripe tile is about to hand over', () => {
+    const value = scanAtOrigin({ ...ground('ripe', 'iron_ore'), yield: 5, purity: 9 });
+
+    expect(value).toMatchObject({ state: 'ripe', resource: 'iron_ore', yield: 5, purity: 9, ripeIn: 0 });
   });
 });

@@ -90,6 +90,12 @@ export interface GroundTile {
 
 `regrowOre()` is deleted. `grid.ts` loses its timer; ripening is a per-tile `ripeAt` check.
 
+**`scan()` becomes a starting command.** Today it costs 120 credits behind mission 2. Once tile
+state is the centre of the game, gating `scan()` means the player cannot see the state machine they
+are operating — they would be guessing at `raw`/`prepared`/`growing`/`ripe` blind. It joins
+`position`/`inventory`/`reset` as always-available. `scanAt(x, y)` stays a paid unlock, because
+reading a tile you are *not* standing on is a genuine capability jump.
+
 ### Adjacency bonus — the "pumpkin"
 
 `yield` is fixed when the tile is seeded:
@@ -148,7 +154,67 @@ Each row is impossible without its concept. This is the heart of the redesign.
 Speed and capacity upgrades (`tick_*`, `capacity_*`) **stay** — TFWR sells drone speed too. They
 move off the spine and become a cheap side branch bought alongside the tiers.
 
-## 7. Throughput and bottlenecks
+## 7. Progression: the tree is the quest log
+
+**The mission chain is deleted.** TFWR has no missions, no objectives list and no quest log. It has
+a tech tree and price tags, and that is the entire goal structure — you see the next unlock, you see
+what it costs, and you work out for yourself what you need to automate to afford it. Nothing ever
+tells the player to do anything.
+
+Our six missions are the weakest part of the current game (four of them are thresholds), so they go
+rather than get rewritten:
+
+| Removed | Replacement |
+|---|---|
+| `MISSIONS`, `MissionDef`, `MissionId`, `MissionGoal` | nothing — the tree carries progression |
+| `UnlockDef.requiresMission` | `requiresUnlocks` only; the dependency graph is the gate |
+| `MissionPanel.ts` | **Tech tree panel** — the same overlay slot, showing the full graph |
+| mission reward credits | nothing; unlocks are paid for out of production |
+| `state.completedMissions` | dropped in the v2 migration |
+
+### What a locked tier card says
+
+This is the one place Factory OS deviates from TFWR, and deliberately. TFWR assumes you already
+know Python; this game teaches JavaScript from zero. So a locked card states **the problem, not a
+quota** — enough that the player knows what they are walking into:
+
+```
+┌──────────────────────────────────────────────┐
+│  SORTING BAY                        LOCKED   │
+│                                              │
+│  The press has 8 slots. It fires only when   │
+│  they are loaded in ascending weight order.  │
+│  You get swapSlots(i, j).                    │
+│                                              │
+│  Needs   400 iron ingot   ✓ 412              │
+│          60 gear          ✗ 31               │
+│                                              │
+│  Teaches: sorting                            │
+└──────────────────────────────────────────────┘
+```
+
+The card names the challenge and the shortfall. It never says "press 8 components 20 times".
+
+### What survives
+
+The **3-step onboarding stays** (open the editor, write a live command, run it). It is not a mission
+chain — it waits on the act itself and ends after the first successful run. From that moment the
+tree is the only guidance, exactly as in TFWR.
+
+### Honest cost: the opening gets harder
+
+Full cultivation is four verbs where mining was one, so the first five minutes are *less* intuitive,
+not more. Deliberate mitigations, all in 10a:
+
+- `scan()` is free from tick zero (above) — the state machine is always visible.
+- Tier-1 seeds ripen in a few ticks, so the plant→harvest cycle is felt immediately rather than
+  waited out.
+- **The starting floor ships with three tiles already `ripe`.** The player's first successful line is
+  `await mine()` — the payoff — and only then do they learn `clear` and `seed` to keep going.
+- `STARTER_SCRIPT` stays fully commented out (onboarding step 2 depends on that) but its comments
+  show the full cycle.
+
+## 8. Throughput and bottlenecks
 
 ```ts
 export type StageId = 'seed' | 'mine' | 'smelt' | 'assemble' | 'press' | 'pour';
@@ -168,7 +234,7 @@ export interface RateSample {
 
 This is the feedback loop that makes rewriting satisfying — the number moves while you watch.
 
-## 8. Save migration
+## 9. Save migration
 
 `SAVE_VERSION` 1 → 2, bumped once in 10a. `MIGRATIONS[1]` performs:
 
@@ -179,6 +245,7 @@ This is the feedback loop that makes rewriting satisfying — the number moves w
 | `grid` | regenerated at the same size, every tile `ground/raw` |
 | `stats.creditsEarned`, `stats.itemsSold` | dropped |
 | `stats.tilesMoved`, `oreMined`, `crafted` | kept |
+| `completedMissions` | dropped — missions no longer exist |
 | `script` | untouched — the player's code is never rewritten |
 
 A console line explains what changed and why. The live factory is converted, not wiped.
@@ -187,7 +254,7 @@ A console line explains what changed and why. The live factory is converted, not
 migrating. That is correct and desirable — the error already routes through `errorHints.ts`, which
 will point at the shop. The migration note names it in advance.
 
-## 9. Phase breakdown
+## 10. Phase breakdown
 
 Each phase ends with `npm run typecheck`, `npm run test`, `npm run build` all green plus a visual
 check by Bastian, then commit **and** push.
@@ -197,23 +264,30 @@ check by Bastian, then commit **and** push.
 ### Phase 10a — Cultivation core
 **Goal:** The player creates the resource; nothing grows back free.
 **Deliverables:** `GroundTile` + `GroundState` in `types.ts`; `clear`/`seed` in `commands.ts`,
-`dispatch.ts`, `api.ts`; `regrowOre()` deleted from `grid.ts`; adjacency yield; `seed_crystal`
-resource and its Seeder recipe; `SAVE_VERSION` → 2 with `MIGRATIONS[1]`; mesh + colour for the four
-ground states.
+`dispatch.ts`, `api.ts`; `scan()` moved to the always-available set; `regrowOre()` deleted from
+`grid.ts`; adjacency yield; `seed_crystal` resource and its Seeder recipe; `SAVE_VERSION` → 2 with
+`MIGRATIONS[1]`; mesh + colour for the four ground states; starting floor ships three `ripe` tiles.
 **Done when:** a script can clear, seed, wait for ripeness and mine on repeat; a block-planted field
-measurably out-yields a scattered one; a real v1 save migrates without data loss.
+measurably out-yields a scattered one; a real v1 save migrates without data loss; a brand-new player
+can mine something on their first run without having seen `clear` or `seed`.
 **Debug pass:** new `cultivation.test.ts` (state transitions, adjacency maths, seed consumption);
-migration tested against an actual exported v1 save; full suite.
+migration tested against an actual exported v1 save; the onboarding test extended to assert the
+three ripe starting tiles; full suite.
 
-### Phase 10b — Resource currency
-**Goal:** Resources are the currency; the market round-trip is gone.
+### Phase 10b — Resource currency and the tech tree
+**Goal:** Resources are the currency, the market round-trip is gone, and the tree replaces missions.
 **Deliverables:** `UnlockDef.cost` → `Inventory`; `credits` removed from `GameState`, HUD, shop and
 `economy.ts`; `sell()` removed; `trade()` added on the market tile; `purchaseBlocker` gains
-`missing_resources`; exponential cost table; missions retargeted off `credits_earned`.
-**Done when:** every unlock is bought with materials, no code path references `state.credits`, and
-the shop names the specific missing resource.
-**Debug pass:** `economy.test.ts` and `progression.test.ts` reworked; grep for `credits` returns
-only migration code.
+`missing_resources`; exponential cost table. **Missions deleted** — `MISSIONS`, `MissionDef`,
+`MissionId`, `MissionGoal`, `completedMissions`, `requiresMission` and `evaluateMissions()` all go;
+`MissionPanel.ts` becomes the tech tree panel in the same overlay slot, with locked cards stating
+the problem and the per-resource shortfall. Concept panels re-hang from missions onto their tiers.
+**Done when:** every unlock is bought with materials; no code path references `state.credits` or any
+mission symbol; a locked card names its challenge and shows which resource is short; the tree alone
+makes the next goal obvious without a quest list.
+**Debug pass:** `economy.test.ts` and `progression.test.ts` reworked; `missions.test.ts` deleted;
+grep for `credits` and `mission` returns only migration code; every concept still has exactly one
+trigger and the teaching order is unchanged.
 
 ### Phase 10c — Instrumentation *(absorbs 9c)*
 **Goal:** Optimisation becomes visible.
@@ -254,17 +328,18 @@ throughput graph shows it.
 
 ---
 
-## 10. Risks
+## 11. Risks
 
 | Risk | Mitigation |
 |---|---|
-| **Cultivation makes the opening tedious** — four verbs before the first ore | Tier 1 grows fast (short `ripeAt`) and the tutorial seeds the first three tiles for the player |
+| **The opening gets less intuitive, not more** — four verbs where mining was one. This is a real cost of the redesign, not a hypothetical | Free `scan()` from tick zero, fast tier-1 ripening, three pre-`ripe` starting tiles so the first run is a payoff, and the full cycle shown in the commented starter script. Measured by the 10a acceptance test: a new player mines something before meeting `clear`/`seed` |
+| **Removing missions leaves the player unguided** — TFWR can assume Python literacy, we cannot | The 3-step onboarding survives, and locked tier cards state the *problem* rather than a quota, so the tree explains itself. If playtesting shows this is too cold, the fallback is one optional "suggested next" hint on the tree — not a mission chain |
 | **The sort tier is a wall** — sorting is genuinely hard for a beginner | It arrives at tier 6, after arrays and nested loops; the concept panel ships a worked bubble sort |
 | **`src/main.ts` is already 637 lines** and every phase adds to it | 10b removes the whole credits/HUD block; extract the cloud section (already logged as tech debt) during 10c |
 | **Migration anger** — the live factory changes shape | Credits convert at a published rate, unlocks and script survive, console explains. Nothing is silently lost |
 | **Scope** — six phases is a lot | Each is independently shippable and verifiable; the game is playable after every one |
 
-## 11. Out of scope
+## 12. Out of scope
 
 - Leaderboard — permanently dropped
 - Auto-`await` / "beginner mode" AST transform — remains rejected

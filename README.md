@@ -224,7 +224,7 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 8 | Supabase: auth, cloud saves, conflict resolution | done |
 | 9a | A worker per robot: the second robot actually runs the script | done |
 | 10a | Cultivation core: clear, seed, grow, mine — nothing regrows free | designed |
-| 10b | Resources become the currency; credits removed | designed |
+| 10b | Resources become the currency; credits and the mission chain removed | designed |
 | 10c | Throughput meter and bottleneck graphs (absorbs 9c) | designed |
 | 10d | Calibration and sorting bay — the first mandatory algorithms | designed |
 | 10e | Foundry pour and pipe routing | designed |

@@ -91,6 +91,7 @@ export class WorldMaterials {
   readonly accent: MeshStandardMaterial;
   readonly heat: MeshStandardMaterial;
   readonly gear: MeshStandardMaterial;
+  readonly groundPrepared: MeshStandardMaterial;
   readonly ore: Record<ResourceId, MeshStandardMaterial>;
 
   constructor(palette: WorldPalette) {
@@ -101,6 +102,7 @@ export class WorldMaterials {
     this.metalDark = new MeshStandardMaterial({ color: palette.metalDark, ...METAL });
     this.robot = new MeshStandardMaterial({ color: palette.robot, ...SURFACE });
     this.gear = new MeshStandardMaterial({ color: palette.gear, ...METAL });
+    this.groundPrepared = new MeshStandardMaterial({ color: palette.groundPrepared, ...SURFACE });
     this.accent = new MeshStandardMaterial({
       color: palette.accent,
       emissive: palette.accent,
@@ -124,6 +126,7 @@ export class WorldMaterials {
         ...METAL,
       }),
       gear: new MeshStandardMaterial({ color: colorFor(palette, 'gear'), ...METAL }),
+      seed_crystal: new MeshStandardMaterial({ color: colorFor(palette, 'seed_crystal'), ...METAL }),
     };
   }
 
@@ -135,6 +138,7 @@ export class WorldMaterials {
     this.accent.dispose();
     this.heat.dispose();
     this.gear.dispose();
+    this.groundPrepared.dispose();
     for (const material of Object.values(this.ore)) material.dispose();
   }
 }

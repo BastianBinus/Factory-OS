@@ -19,6 +19,8 @@ const TOKENS = {
   ingotIron: '--w-ingot-iron',
   ingotCopper: '--w-ingot-copper',
   gear: '--w-gear',
+  groundPrepared: '--w-ground-prepared',
+  seedCrystal: '--w-seed-crystal',
   heat: '--w-heat',
   sky: '--w-sky',
   accent: '--accent',
@@ -59,6 +61,7 @@ const RESOURCE_KEYS: Record<ResourceId, PaletteKey> = {
   iron_ingot: 'ingotIron',
   copper_ingot: 'ingotCopper',
   gear: 'gear',
+  seed_crystal: 'seedCrystal',
 };
 
 export function colorFor(palette: WorldPalette, resource: ResourceId): Color {

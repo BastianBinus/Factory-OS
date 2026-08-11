@@ -6,12 +6,41 @@
 
 export type Direction = 'north' | 'east' | 'south' | 'west';
 
-export type ResourceId = 'iron_ore' | 'copper_ore' | 'iron_ingot' | 'copper_ingot' | 'gear';
+export type ResourceId =
+  | 'iron_ore'
+  | 'copper_ore'
+  | 'iron_ingot'
+  | 'copper_ingot'
+  | 'gear'
+  | 'seed_crystal';
 
-export type MachineId = 'smelter' | 'assembler';
+export type MachineId = 'smelter' | 'assembler' | 'seeder';
 
 /** Sparse on purpose: a missing key means zero. Use the helpers in resources.ts. */
 export type Inventory = Partial<Record<ResourceId, number>>;
+
+export type GroundState = 'raw' | 'prepared' | 'growing' | 'ripe';
+
+/**
+ * A tile of factory floor and everything that can be growing on it.
+ *
+ * The four states are a cycle, not a ladder: clear() takes raw to prepared,
+ * seed() takes prepared to growing, the world takes growing to ripe on its own
+ * clock, and mine() takes ripe back to raw. Nothing here ever advances without
+ * a robot except the one step the player already paid for.
+ */
+export interface GroundTile {
+  kind: 'ground';
+  state: GroundState;
+  /** What is planted, or null on raw and prepared ground. */
+  resource: ResourceId | null;
+  /** Tick this crop turns ripe, or null when nothing is growing. */
+  ripeAt: number | null;
+  /** What mine() will hand over. Fixed at seeding time from the neighbours. */
+  yield: number;
+  /** 1..10, fixed at seeding time. The sorting bay in 10d reads it. */
+  purity: number;
+}
 
 export interface FloorTile {
   kind: 'floor';
@@ -43,7 +72,7 @@ export interface MarketTile {
   kind: 'market';
 }
 
-export type Tile = FloorTile | OreTile | MachineTile | MarketTile;
+export type Tile = GroundTile | FloorTile | OreTile | MachineTile | MarketTile;
 
 export interface Robot {
   id: string;

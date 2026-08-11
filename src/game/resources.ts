@@ -11,6 +11,14 @@ export const RESOURCES: Record<ResourceId, ResourceDef> = {
     sellPrice: 11,
   },
   gear: { id: 'gear', label: 'Gear', colorToken: 'w-gear', sellPrice: 40 },
+  seed_crystal: {
+    id: 'seed_crystal',
+    label: 'Seed crystal',
+    colorToken: 'w-seed-crystal',
+    // Priced at what its inputs are worth, so selling a crystal is never a
+    // loss and never a trick. sell() disappears in 10b and takes this with it.
+    sellPrice: 6,
+  },
 };
 
 export const RESOURCE_IDS = Object.keys(RESOURCES) as ResourceId[];

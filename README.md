@@ -223,6 +223,15 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 7 | Polish and deploy to Vercel | done |
 | 8 | Supabase: auth, cloud saves, conflict resolution | done |
 | 9a | A worker per robot: the second robot actually runs the script | done |
-| 9b | Conveyor belts | planned |
-| 9c | Statistics graphs | planned |
+| 10a | Cultivation core: clear, seed, grow, mine — nothing regrows free | designed |
+| 10b | Resources become the currency; credits removed | designed |
+| 10c | Throughput meter and bottleneck graphs (absorbs 9b) | designed |
+| 10d | Calibration and sorting bay — the first mandatory algorithms | designed |
+| 10e | Foundry pour and pipe routing | designed |
+| 10f | Conveyor belts (absorbs 9b) | designed |
 | 9d | Script library with real modules | planned |
+
+Phase 10 reworks the gameplay loop along the lines of *The Farmer Was Replaced*: the player plants
+and harvests rather than collecting from nodes that refill themselves, resources are spent directly
+instead of sold for credits, and each tier is impossible without a specific algorithm. Full design:
+[`docs/specs/2026-08-11-gameplay-loop-redesign.md`](docs/specs/2026-08-11-gameplay-loop-redesign.md).

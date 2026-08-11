@@ -29,6 +29,13 @@ export const UNLOCKS: UnlockDef[] = [
     commands: ['mine'],
   },
   {
+    id: 'cultivate',
+    label: 'clear() and seed()',
+    description: 'Turn a tile into a field, and plant a seed crystal in it.',
+    cost: 0,
+    commands: ['clear', 'seed'],
+  },
+  {
     id: 'print',
     label: 'print()',
     description: 'Write a value into the console.',
@@ -52,11 +59,11 @@ export const UNLOCKS: UnlockDef[] = [
   {
     id: 'scan',
     label: 'scan()',
-    description: 'Read what is on the tile below the robot.',
-    cost: 120,
-    requiresMission: 'm2_mine',
+    // Free, and owned from the first tick. A crop the player cannot look at is a
+    // timer they have to count by hand, which is a worse game and a worse lesson.
+    description: 'Read the tile below the robot: what is on it, and how long it has left.',
+    cost: 0,
     commands: ['scan'],
-    conceptId: 'if_else',
   },
   {
     id: 'drop',
@@ -82,7 +89,7 @@ export const UNLOCKS: UnlockDef[] = [
     cost: 450,
     requiresUnlocks: ['scan'],
     commands: ['scanAt'],
-    conceptId: 'objects',
+    conceptId: 'if_else',
   },
   {
     id: 'capacity_20',
@@ -141,6 +148,7 @@ export const UNLOCKS: UnlockDef[] = [
     requiresMission: 'm6_rich',
     // me() only means anything once there is someone else to be told apart from.
     commands: ['me'],
+    conceptId: 'objects',
   },
 ];
 
@@ -415,13 +423,13 @@ export function applyUnlockEffect(state: GameState, id: UnlockId): void {
   }
 }
 
-/** Places a new robot on the first free floor tile, scanning from the north-west. */
+/** Places a new robot on the first free tile of ground, scanning from the north-west. */
 function addRobot(state: GameState): void {
   const taken = new Set(state.robots.map((robot) => `${robot.x},${robot.y}`));
   let spot: { x: number; y: number } | undefined;
 
   forEachTile(state.grid, (tile, x, y) => {
-    if (spot || tile.kind !== 'floor' || taken.has(`${x},${y}`)) return;
+    if (spot || tile.kind !== 'ground' || taken.has(`${x},${y}`)) return;
     spot = { x, y };
   });
 

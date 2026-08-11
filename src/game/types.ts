@@ -109,6 +109,7 @@ export interface ResourceDef {
 export type UnlockId =
   | 'move'
   | 'mine'
+  | 'cultivate'
   | 'drop'
   | 'sell'
   | 'wait'

@@ -48,10 +48,10 @@ mine();`,
     body:
       'An if statement runs its block only when the condition is true, and the else block runs when it is not. ' +
       'Comparisons build those conditions: === asks whether two values are exactly the same. ' +
-      'Now that scan() can tell the robot what it is standing on, it can decide instead of guessing.',
+      'scan() tells the robot what state the tile below it is in, which is what turns a guess into a decision.',
     codeExample: `const tile = await scan();
 
-if (tile.type === 'ore') {
+if (tile.state === 'ripe') {
   await mine();
 } else {
   await move('east');

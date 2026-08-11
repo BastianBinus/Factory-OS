@@ -3,23 +3,34 @@ import { explainError } from '../src/engine/errorHints';
 import { getMission, getUnlock } from '../src/game/progression';
 
 /** What a fresh save can call. Everything else is genuinely absent from the API. */
-const STARTING = ['credits', 'inventory', 'mine', 'move', 'position', 'print', 'reset'];
+const STARTING = [
+  'clear',
+  'credits',
+  'inventory',
+  'mine',
+  'move',
+  'position',
+  'print',
+  'reset',
+  'scan',
+  'seed',
+];
 
 describe('locked commands', () => {
   it('turns a missing name into a pointer at the shop', () => {
     const hint = explainError(
-      { name: 'ReferenceError', message: 'scan is not defined', line: 4 },
+      { name: 'ReferenceError', message: 'drop is not defined', line: 4 },
       STARTING,
     );
 
-    expect(hint.message).toBe('scan() is not unlocked yet.');
-    expect(hint.detail).toContain(`${getUnlock('scan')?.cost} cr`);
+    expect(hint.message).toBe('drop() is not unlocked yet.');
+    expect(hint.detail).toContain(`${getUnlock('drop')?.cost} cr`);
     expect(hint.line).toBe(4);
   });
 
   it('names the mission that stands in the way', () => {
     const hint = explainError(
-      { name: 'ReferenceError', message: 'scan is not defined', line: 1 },
+      { name: 'ReferenceError', message: 'drop is not defined', line: 1 },
       STARTING,
     );
 

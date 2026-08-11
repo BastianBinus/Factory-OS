@@ -32,6 +32,11 @@ export interface EditorOptions {
 const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
   move: { detail: "await move('north')", info: 'Drive one tile. north, east, south or west.' },
   mine: { detail: 'await mine()', info: 'Take one unit of ore from the tile below the robot.' },
+  clear: { detail: 'await clear()', info: 'Prepare the tile below the robot for planting.' },
+  seed: {
+    detail: "await seed('iron_ore')",
+    info: 'Plant a seed crystal in the prepared tile below the robot.',
+  },
   drop: { detail: 'await drop()', info: 'Load what the robot carries into the machine below it.' },
   craft: { detail: 'await craft()', info: 'Start the machine below the robot.' },
   take: { detail: 'await take()', info: 'Collect what the machine below the robot produced.' },

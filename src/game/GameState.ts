@@ -9,7 +9,7 @@ export const DEFAULT_TICK_RATE_MS = 400;
 export const DEFAULT_CAPACITY = 10;
 export const DEFAULT_REGROW_TICKS = 30;
 
-export const STARTING_UNLOCKS: UnlockId[] = ['move', 'mine', 'print'];
+export const STARTING_UNLOCKS: UnlockId[] = ['move', 'mine', 'print', 'scan', 'cultivate'];
 
 /** Steps of the opening tutorial; anything at or above this means it is over. */
 export const ONBOARDING_DONE = 3;

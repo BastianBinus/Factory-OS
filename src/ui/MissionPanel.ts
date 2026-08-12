@@ -1,19 +1,23 @@
-import type { ConceptDef, GameState, MissionDef } from '../game/types';
-import { CONCEPTS, conceptNumber, reachedConcepts } from '../game/concepts';
-import { MISSIONS, activeMission, getUnlock, missionProgress } from '../game/progression';
+import type { ConceptDef, GameState, UnlockDef } from '../game/types';
+import { CONCEPTS, conceptNumber, getConcept, reachedConcepts } from '../game/concepts';
+import { UNLOCKS, getUnlock, purchaseBlocker } from '../game/progression';
+import { hasUnlock } from '../game/GameState';
+import { missingResources } from '../game/economy';
+import { describeInventory, totalItems } from '../game/resources';
 import { Drawer } from './Drawer';
 
 /**
- * The mission chain, in order, with the one being worked on marked, and under it
- * every concept the game has explained so far.
+ * The tech tree as the whole goal structure — there are no missions. Every
+ * upgrade is listed in order, owned or not, so the player can see what is coming
+ * and read the price as the objective. A locked node states its prerequisite or,
+ * when the fleet just cannot cover the bill yet, exactly what it is short of.
  *
- * Every mission is listed from the start, including the ones far ahead. Seeing
- * that gears come after ingots is what makes the next command worth buying —
- * hiding the chain would turn a learning path back into a guessing game.
+ * Under the tree sits every concept the game has explained: a modal you
+ * dismissed is gone, and nobody remembers how for…of works on the first reading,
+ * so this is where it lives afterwards.
  *
- * The concept list is the other half of that: a modal you dismissed is gone, and
- * nobody remembers how for…of works on the first reading. This is where it lives
- * afterwards.
+ * (The file is still MissionPanel.ts and the class still MissionPanel: the panel
+ * kept its overlay slot when missions were removed, and only its contents changed.)
  */
 
 export interface MissionPanelOptions {
@@ -23,10 +27,10 @@ export interface MissionPanelOptions {
 }
 
 interface Row {
-  mission: MissionDef;
+  unlock: UnlockDef;
   root: HTMLElement;
   status: HTMLElement;
-  fill: HTMLElement;
+  note: HTMLElement;
 }
 
 interface ConceptRow {
@@ -44,15 +48,15 @@ export class MissionPanel {
   constructor(options: MissionPanelOptions) {
     this.drawer = new Drawer({
       parent: options.parent,
-      title: 'Missions',
+      title: 'Tech tree',
       ...(options.onToggle ? { onToggle: options.onToggle } : {}),
     });
 
     const list = document.createElement('ol');
     list.className = 'drawer__list';
 
-    for (const mission of MISSIONS) {
-      const row = buildRow(mission);
+    for (const unlock of UNLOCKS) {
+      const row = buildRow(unlock);
       this.rows.push(row);
       list.appendChild(row.root);
     }
@@ -92,21 +96,20 @@ export class MissionPanel {
   }
 
   render(state: GameState): void {
-    const current = activeMission(state);
-    const done = state.completedMissions.length;
-    this.drawer.setNote(current ? `${done + 1} of ${MISSIONS.length}` : 'All done');
+    const owned = state.unlocks.length;
+    this.drawer.setNote(`${owned} of ${UNLOCKS.length}`);
 
     for (const row of this.rows) {
-      const finished = state.completedMissions.includes(row.mission.id);
-      const isCurrent = current?.id === row.mission.id;
-      const progress = missionProgress(state, row.mission);
+      const has = hasUnlock(state, row.unlock.id);
+      const blocker = has ? undefined : purchaseBlocker(state, row.unlock.id);
 
-      row.root.classList.toggle('mission--done', finished);
-      row.root.classList.toggle('mission--active', isCurrent);
+      row.root.classList.toggle('mission--done', has);
+      row.root.classList.toggle('mission--active', blocker === undefined && !has);
 
-      row.status.textContent = finished ? 'Done' : `${progress.current} / ${progress.target}`;
-      const share = progress.target === 0 ? 1 : progress.current / progress.target;
-      row.fill.style.width = `${Math.round((finished ? 1 : share) * 100)}%`;
+      row.status.textContent = statusWord(has, blocker);
+      const note = has ? '' : requirementNote(state, row.unlock, blocker);
+      row.note.textContent = note;
+      row.note.hidden = note === '';
     }
 
     const reached = new Set(reachedConcepts(state).map((concept) => concept.id));
@@ -116,17 +119,24 @@ export class MissionPanel {
   }
 }
 
-function buildRow(mission: MissionDef): Row {
+function statusWord(owned: boolean, blocker: ReturnType<typeof purchaseBlocker>): string {
+  if (owned) return 'Owned';
+  if (blocker === undefined) return 'Ready';
+  if (blocker === 'unlock_locked') return 'Locked';
+  return 'Saving';
+}
+
+function buildRow(unlock: UnlockDef): Row {
   const root = document.createElement('li');
   root.className = 'mission';
-  root.dataset['mission'] = mission.id;
+  root.dataset['unlock'] = unlock.id;
 
   const head = document.createElement('div');
   head.className = 'mission__head';
 
   const title = document.createElement('span');
   title.className = 't-title';
-  title.textContent = mission.title;
+  title.textContent = unlock.label;
 
   const status = document.createElement('span');
   status.className = 'mission__status';
@@ -135,20 +145,17 @@ function buildRow(mission: MissionDef): Row {
 
   const summary = document.createElement('p');
   summary.className = 't-body t-muted';
-  summary.textContent = mission.summary;
+  summary.textContent = unlock.description;
 
-  const bar = document.createElement('div');
-  bar.className = 'progress';
-  const fill = document.createElement('i');
-  fill.className = 'progress__fill';
-  bar.appendChild(fill);
+  const note = document.createElement('p');
+  note.className = 'mission__reward';
 
-  const reward = document.createElement('p');
-  reward.className = 'mission__reward';
-  reward.textContent = describeReward(mission);
+  const cost = document.createElement('p');
+  cost.className = 'mission__reward';
+  cost.textContent = describeCost(unlock);
 
-  root.append(head, summary, bar, reward);
-  return { mission, root, status, fill };
+  root.append(head, summary, cost, note);
+  return { unlock, root, status, note };
 }
 
 function buildConceptRow(concept: ConceptDef, onOpen: () => void): ConceptRow {
@@ -171,8 +178,28 @@ function buildConceptRow(concept: ConceptDef, onOpen: () => void): ConceptRow {
   return { concept, root };
 }
 
-function describeReward(mission: MissionDef): string {
-  const parts = [`${mission.rewardCredits} cr`];
-  for (const id of mission.grants) parts.push(getUnlock(id)?.label ?? id);
-  return `Reward: ${parts.join(' · ')}`;
+function describeCost(unlock: UnlockDef): string {
+  const teaches = unlock.conceptId ? getConcept(unlock.conceptId)?.title : undefined;
+  const price = totalItems(unlock.cost) === 0 ? 'Free' : `Costs ${describeInventory(unlock.cost)}`;
+  return teaches ? `${price} · teaches ${teaches}` : price;
+}
+
+/** The prerequisite that is missing, or the resources the fleet is short of. */
+function requirementNote(
+  state: GameState,
+  unlock: UnlockDef,
+  blocker: ReturnType<typeof purchaseBlocker>,
+): string {
+  if (blocker === 'unlock_locked') {
+    const missing = (unlock.requiresUnlocks ?? [])
+      .filter((id) => !hasUnlock(state, id))
+      .map((id) => getUnlock(id)?.label ?? id);
+    return `Needs ${missing.join(' and ')} first.`;
+  }
+
+  if (blocker === 'missing_resources') {
+    return `Short ${describeInventory(missingResources(state, unlock.cost))}.`;
+  }
+
+  return '';
 }

@@ -1,16 +1,18 @@
 import type { GameState, UnlockDef, UnlockId } from '../game/types';
 import { hasUnlock } from '../game/GameState';
-import { UNLOCKS, getMission, getUnlock, purchaseBlocker, visibleUnlocks } from '../game/progression';
+import { UNLOCKS, getUnlock, purchaseBlocker, visibleUnlocks } from '../game/progression';
 import type { PurchaseFailure } from '../game/progression';
+import { missingResources, totalResources } from '../game/economy';
+import { describeInventory, totalItems } from '../game/resources';
 import { Drawer } from './Drawer';
 
 /**
  * The tech tree as a grid of cards.
  *
  * Every card is built once and afterwards only re-dressed, never replaced. That
- * matters more than it looks: credits change on almost every tick while ore is
- * being sold, so this panel repaints constantly, and a rebuilt DOM would drop
- * keyboard focus out of the Buy button between two ticks.
+ * matters more than it looks: the fleet's cargo changes on almost every tick, so
+ * this panel repaints constantly, and a rebuilt DOM would drop keyboard focus
+ * out of the Buy button between two ticks.
  */
 
 export interface ShopPanelOptions {
@@ -65,7 +67,7 @@ export class ShopPanel {
 
   render(state: GameState): void {
     const visible = new Set(visibleUnlocks(state).map((unlock) => unlock.id));
-    this.drawer.setNote(`${state.credits} cr`);
+    this.drawer.setNote(describeInventory(totalResources(state)));
 
     for (const card of this.cards) {
       card.root.hidden = !visible.has(card.unlock.id);
@@ -131,10 +133,14 @@ function dressCard(card: Card, state: GameState): void {
 
   card.root.classList.toggle('card--owned', owned);
   card.root.classList.toggle('card--affordable', blocker === undefined);
-  card.root.classList.toggle('card--locked', blocker === 'mission_locked' || blocker === 'unlock_locked');
+  card.root.classList.toggle('card--locked', blocker === 'unlock_locked');
 
   card.price.className = owned ? 'card__check' : 'card__price';
-  card.price.textContent = owned ? 'Owned' : `${card.unlock.cost} cr`;
+  card.price.textContent = owned
+    ? 'Owned'
+    : totalItems(card.unlock.cost) === 0
+      ? 'Free'
+      : describeInventory(card.unlock.cost);
 
   const note = owned ? '' : requirementNote(state, card.unlock, blocker);
   card.note.textContent = note;
@@ -145,25 +151,25 @@ function dressCard(card: Card, state: GameState): void {
 }
 
 /**
- * Only the requirements the price tag cannot express. `too_expensive` is left
- * silent on purpose — the card already shows the price and the drawer header
- * shows the balance, so a sentence saying the same thing is noise.
+ * The two things the price tag cannot say on its own: which prerequisite node
+ * is missing, and — when the fleet simply cannot cover the bill yet — exactly
+ * what it is short of. That shortfall is what the tree card owes the player in
+ * place of the old "you have N credits" line.
  */
 function requirementNote(
   state: GameState,
   unlock: UnlockDef,
   blocker: PurchaseFailure | undefined,
 ): string {
-  if (blocker === 'mission_locked') {
-    const mission = unlock.requiresMission ? getMission(unlock.requiresMission) : undefined;
-    return `Locked until the mission "${mission?.title ?? unlock.requiresMission}" is done.`;
-  }
-
   if (blocker === 'unlock_locked') {
     const missing = (unlock.requiresUnlocks ?? [])
       .filter((id) => !hasUnlock(state, id))
       .map((id) => getUnlock(id)?.label ?? id);
     return `Needs ${missing.join(' and ')} first.`;
+  }
+
+  if (blocker === 'missing_resources') {
+    return `Short ${describeInventory(missingResources(state, unlock.cost))}.`;
   }
 
   return '';

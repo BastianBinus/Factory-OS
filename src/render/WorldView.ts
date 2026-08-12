@@ -453,8 +453,10 @@ const MACHINE_MARK: Record<MachineId, string> = {
  * prepared to growing to ripe is a change the *views* handle in `syncTiles`; if
  * it changed the signature instead, the whole floor would be torn down and
  * rebuilt on the tick a single crop came in.
+ *
+ * Exported for the test that holds that promise to it.
  */
-function gridSignature(grid: Grid): string {
+export function gridSignature(grid: Grid): string {
   const kinds = grid.tiles
     .map((tile) => {
       if (tile.kind === 'ground') return '.';

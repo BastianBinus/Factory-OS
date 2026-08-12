@@ -52,26 +52,27 @@ describe('recognising a live command', () => {
 /**
  * The starting position is not the middle of the floor, and the comment on
  * `startPosition` explains why. This is the half of that promise a comment cannot
- * keep: the tutorial hands the player a script that walks south and mines, so
- * there has to be ore south of where they start. Move the robot or move that ore
- * and a brand new player's very first script walks into a wall.
+ * keep: the tutorial hands the player a script that walks south and harvests, so
+ * there has to be a ripe patch south of where they start. Move the robot or move
+ * that patch and a brand new player's very first script walks into bare ground.
  */
 describe('the starting floor answers the starter script', () => {
-  it('has ore somewhere south of the robot, within reach', () => {
+  it('has a ripe patch somewhere south of the robot, within reach', () => {
     const state = createInitialState();
     const start = robotOf(state);
     const steps = state.grid.height - 1 - start.y;
 
-    let mined = false;
-    for (let i = 0; i < steps && !mined; i += 1) {
+    let harvested = false;
+    for (let i = 0; i < steps && !harvested; i += 1) {
       expectOk(runTick(state, (ctx) => move(ctx, 'south')));
 
       const robot = robotOf(state);
-      if (tileAt(state.grid, robot.x, robot.y)?.kind !== 'ore') continue;
+      const tile = tileAt(state.grid, robot.x, robot.y);
+      if (tile?.kind !== 'ground' || tile.state !== 'ripe') continue;
       expectOk(runTick(state, mine));
-      mined = true;
+      harvested = true;
     }
 
-    expect(mined, 'walking south from the start reaches no ore').toBe(true);
+    expect(harvested, 'walking south from the start reaches no ripe patch').toBe(true);
   });
 });

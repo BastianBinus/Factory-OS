@@ -1,14 +1,16 @@
 import type { GameState } from './types';
 import {
   DEFAULT_CAPACITY,
-  DEFAULT_REGROW_TICKS,
   DEFAULT_TICK_RATE_MS,
+  INITIAL_LAYOUT,
   ONBOARDING_DONE,
   SAVE_VERSION,
   STARTER_SCRIPT,
   STARTING_UNLOCKS,
   createInitialState,
+  gridFromLayout,
 } from './GameState';
+import { expandGrid } from './grid';
 import { readString, remove, writeString } from '../utils/storage';
 
 export const SAVE_KEY = 'factoryos.save';
@@ -41,13 +43,36 @@ const MIGRATIONS: Record<number, Migration> = {
     ...data,
     tickRateMs: data['tickRateMs'] ?? DEFAULT_TICK_RATE_MS,
     inventoryCapacity: data['inventoryCapacity'] ?? DEFAULT_CAPACITY,
-    oreRegrowTicks: data['oreRegrowTicks'] ?? DEFAULT_REGROW_TICKS,
     seenConcepts: data['seenConcepts'] ?? [],
     completedMissions: data['completedMissions'] ?? [],
     unlocks: data['unlocks'] ?? [...STARTING_UNLOCKS],
     script: data['script'] ?? STARTER_SCRIPT,
     version: 1,
   }),
+
+  /**
+   * Cultivation. Every ore node and every floor tile in a v1 save describes a
+   * world that no longer exists, and there is no honest tile-by-tile conversion:
+   * an ore node was a thing that refilled itself, and nothing does that any more.
+   *
+   * So the floor is rebuilt from scratch at the size the player paid for —
+   * exactly what resetWorld() does — and everything they earned is left
+   * untouched. It costs them the arrangement of a floor they never arranged.
+   */
+  1: (data) => {
+    const next = { ...data };
+    delete next['oreRegrowTicks'];
+
+    const grid = next['grid'];
+    const size =
+      isRecord(grid) && typeof grid['width'] === 'number' && typeof grid['height'] === 'number'
+        ? Math.max(grid['width'], grid['height'])
+        : 8;
+
+    next['grid'] = expandGrid(gridFromLayout(INITIAL_LAYOUT), size);
+    next['version'] = 2;
+    return next;
+  },
 };
 
 export function serialize(state: GameState): string {
@@ -167,7 +192,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * shallow enough that adding an optional field later does not invalidate saves.
  */
 function isGameState(data: Record<string, unknown>): data is Record<string, unknown> & GameState {
-  const numbers = ['version', 'tick', 'credits', 'tickRateMs', 'inventoryCapacity', 'oreRegrowTicks'];
+  const numbers = ['version', 'tick', 'credits', 'tickRateMs', 'inventoryCapacity'];
   for (const key of numbers) {
     if (typeof data[key] !== 'number' || !Number.isFinite(data[key])) return false;
   }

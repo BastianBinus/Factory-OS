@@ -1,4 +1,4 @@
-import type { CommandResult, GameState, MachineTile, OreTile, Robot } from '../src/game/types';
+import type { CommandResult, GameState, GroundTile, MachineTile, Robot } from '../src/game/types';
 import { createInitialState, createRobot, gridFromLayout } from '../src/game/GameState';
 import { tileAt } from '../src/game/grid';
 import { advanceWorld, move } from '../src/engine/commands';
@@ -62,9 +62,9 @@ export function walkTo(state: GameState, x: number, y: number): number {
   return ticks;
 }
 
-export function oreAt(state: GameState, x: number, y: number): OreTile {
+export function groundAt(state: GameState, x: number, y: number): GroundTile {
   const tile = tileAt(state.grid, x, y);
-  if (tile?.kind !== 'ore') throw new Error(`no ore at ${x},${y}`);
+  if (tile?.kind !== 'ground') throw new Error(`no ground at ${x},${y}`);
   return tile;
 }
 

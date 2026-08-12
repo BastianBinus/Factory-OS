@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Grid, OreTile } from '../src/game/types';
+import type { Grid } from '../src/game/types';
 import {
   DIRECTION_VECTORS,
   expandGrid,
@@ -7,7 +7,6 @@ import {
   inBounds,
   indexOf,
   isDirection,
-  regrowOre,
   setTile,
   step,
   tileAt,
@@ -17,7 +16,14 @@ function emptyGrid(width: number, height: number): Grid {
   return {
     width,
     height,
-    tiles: Array.from({ length: width * height }, () => ({ kind: 'floor' as const })),
+    tiles: Array.from({ length: width * height }, () => ({
+      kind: 'ground' as const,
+      state: 'raw' as const,
+      resource: null,
+      ripeAt: null,
+      yield: 0,
+      purity: 0,
+    })),
   };
 }
 
@@ -71,61 +77,41 @@ describe('bounds and indexing', () => {
   });
 });
 
-describe('ore regrowth', () => {
-  it('refills only nodes whose regrow tick has arrived', () => {
-    const grid = emptyGrid(2, 1);
-    const early: OreTile = { kind: 'ore', resource: 'iron_ore', amount: 0, regrowAt: 10 };
-    const late: OreTile = { kind: 'ore', resource: 'iron_ore', amount: 0, regrowAt: 40 };
-    setTile(grid, 0, 0, early);
-    setTile(grid, 1, 0, late);
-
-    const regrown = regrowOre(grid, 10, 20);
-
-    expect(regrown).toHaveLength(1);
-    expect(early.amount).toBe(20);
-    expect(early.regrowAt).toBeNull();
-    expect(late.amount).toBe(0);
-  });
-
-  it('leaves nodes that still hold ore alone', () => {
-    const grid = emptyGrid(1, 1);
-    const tile: OreTile = { kind: 'ore', resource: 'iron_ore', amount: 5, regrowAt: null };
-    setTile(grid, 0, 0, tile);
-
-    expect(regrowOre(grid, 999, 20)).toHaveLength(0);
-    expect(tile.amount).toBe(5);
-  });
-});
-
 describe('expandGrid', () => {
   it('keeps every existing tile at its old coordinates', () => {
     const grid = emptyGrid(4, 4);
     const market = { kind: 'market' as const };
     setTile(grid, 0, 0, market);
-    setTile(grid, 3, 3, { kind: 'ore', resource: 'copper_ore', amount: 7, regrowAt: null });
+    setTile(grid, 3, 3, {
+      kind: 'ground',
+      state: 'ripe',
+      resource: 'copper_ore',
+      ripeAt: null,
+      yield: 7,
+      purity: 2,
+    });
 
-    const bigger = expandGrid(grid, 8, 20);
+    const bigger = expandGrid(grid, 8);
 
     expect(bigger.width).toBe(8);
     expect(bigger.height).toBe(8);
     expect(bigger.tiles).toHaveLength(64);
     expect(tileAt(bigger, 0, 0)).toBe(market);
-    expect(tileAt(bigger, 3, 3)).toMatchObject({ kind: 'ore', amount: 7 });
+    expect(tileAt(bigger, 3, 3)).toMatchObject({ kind: 'ground', state: 'ripe', yield: 7 });
   });
 
-  it('is deterministic — the same expansion twice gives the same ore layout', () => {
-    const a = expandGrid(emptyGrid(4, 4), 10, 20);
-    const b = expandGrid(emptyGrid(4, 4), 10, 20);
-    expect(a.tiles.map((tile) => tile.kind)).toEqual(b.tiles.map((tile) => tile.kind));
-  });
+  // Land is space to plant in, not a pile of free resources.
+  it('fills the new land with raw ground and nothing else', () => {
+    const bigger = expandGrid(emptyGrid(4, 4), 12);
 
-  it('scatters at least one ore node on the new ground', () => {
-    const bigger = expandGrid(emptyGrid(4, 4), 12, 20);
-    expect(bigger.tiles.some((tile) => tile.kind === 'ore')).toBe(true);
+    expect(bigger.tiles).toHaveLength(144);
+    expect(
+      bigger.tiles.every((tile) => tile.kind === 'ground' && tile.state === 'raw'),
+    ).toBe(true);
   });
 
   it('returns the same grid when the target size is not bigger', () => {
     const grid = emptyGrid(8, 8);
-    expect(expandGrid(grid, 8, 20)).toBe(grid);
+    expect(expandGrid(grid, 8)).toBe(grid);
   });
 });

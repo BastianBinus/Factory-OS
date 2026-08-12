@@ -30,6 +30,14 @@ export const RECIPES: Recipe[] = [
     outputAmount: 1,
     ticks: 8,
   },
+  {
+    id: 'craft_seed_crystal',
+    machine: 'seeder',
+    inputs: { iron_ore: 2 },
+    output: 'seed_crystal',
+    outputAmount: 1,
+    ticks: 3,
+  },
 ];
 
 export function getRecipe(id: string): Recipe | undefined {

@@ -9,7 +9,7 @@ import {
   Shape,
   SphereGeometry,
 } from 'three';
-import type { MachineId, ResourceId } from '../game/types';
+import type { GroundState, MachineId, ResourceId } from '../game/types';
 import type { WorldPalette } from './palette';
 import { colorFor } from './palette';
 
@@ -91,6 +91,7 @@ export class WorldMaterials {
   readonly accent: MeshStandardMaterial;
   readonly heat: MeshStandardMaterial;
   readonly gear: MeshStandardMaterial;
+  readonly groundPrepared: MeshStandardMaterial;
   readonly ore: Record<ResourceId, MeshStandardMaterial>;
 
   constructor(palette: WorldPalette) {
@@ -101,6 +102,7 @@ export class WorldMaterials {
     this.metalDark = new MeshStandardMaterial({ color: palette.metalDark, ...METAL });
     this.robot = new MeshStandardMaterial({ color: palette.robot, ...SURFACE });
     this.gear = new MeshStandardMaterial({ color: palette.gear, ...METAL });
+    this.groundPrepared = new MeshStandardMaterial({ color: palette.groundPrepared, ...SURFACE });
     this.accent = new MeshStandardMaterial({
       color: palette.accent,
       emissive: palette.accent,
@@ -124,6 +126,7 @@ export class WorldMaterials {
         ...METAL,
       }),
       gear: new MeshStandardMaterial({ color: colorFor(palette, 'gear'), ...METAL }),
+      seed_crystal: new MeshStandardMaterial({ color: colorFor(palette, 'seed_crystal'), ...METAL }),
     };
   }
 
@@ -135,6 +138,7 @@ export class WorldMaterials {
     this.accent.dispose();
     this.heat.dispose();
     this.gear.dispose();
+    this.groundPrepared.dispose();
     for (const material of Object.values(this.ore)) material.dispose();
   }
 }
@@ -148,6 +152,7 @@ export class WorldMaterials {
 export class WorldGeometry {
   readonly floorTile = chamferedBox(0.97, 0.08, 0.97, 0.06, 0.02);
   readonly oreChunk = chamferedBox(0.24, 0.2, 0.24, 0.07, 0.04);
+  readonly groundSlab = chamferedBox(0.7, 0.03, 0.7, 0.06, 0.012);
   readonly robotBody = chamferedBox(0.56, 0.3, 0.56, 0.09, 0.035);
   readonly robotDome = new SphereGeometry(0.2, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2);
   readonly robotStripe = chamferedBox(0.58, 0.05, 0.58, 0.09, 0.015);
@@ -158,6 +163,8 @@ export class WorldGeometry {
   readonly assemblerPost = chamferedBox(0.1, 0.44, 0.1, 0.03, 0.015);
   readonly assemblerHead = chamferedBox(0.5, 0.14, 0.5, 0.05, 0.02);
   readonly assemblerGear = new CylinderGeometry(0.19, 0.19, 0.09, 12);
+  readonly seederHopper = chamferedBox(0.44, 0.4, 0.44, 0.1, 0.03);
+  readonly seederSpout = chamferedBox(0.16, 0.22, 0.16, 0.04, 0.02);
   readonly marketDeck = chamferedBox(0.88, 0.14, 0.88, 0.07, 0.03);
   readonly marketPost = chamferedBox(0.08, 0.5, 0.08, 0.025, 0.012);
   readonly marketRoof = chamferedBox(0.94, 0.1, 0.94, 0.08, 0.03);
@@ -187,35 +194,55 @@ const ORE_CHUNKS = [
   { x: -0.14, z: 0.18, scale: 0.66, rotation: -0.3 },
 ] as const;
 
-export interface OreView {
+export interface GroundView {
   group: Group;
-  /** Shows fewer chunks as the node empties; hides the last one at zero. */
-  setFill(ratio: number): void;
+  /** Redraws for the tile's current state. Only toggles and rescales — no allocation. */
+  setState(state: GroundState, resource: ResourceId | null): void;
 }
 
-export function createOre(
-  geometry: WorldGeometry,
-  materials: WorldMaterials,
-  resource: ResourceId,
-): OreView {
+/**
+ * One of these exists for every ground tile on the floor, which at 16x16 means
+ * 256 groups. That is the price of the four-state cycle being visible; if it
+ * ever shows up in a frame profile, the fix is one InstancedMesh per state, not
+ * a cheaper tile.
+ *
+ * It reuses the ore chunk and its four fixed positions on purpose: a harvest and
+ * a mined node should look like the same substance, because they are.
+ */
+export function createGround(geometry: WorldGeometry, materials: WorldMaterials): GroundView {
   const group = new Group();
-  const chunks: Mesh[] = [];
 
+  // Tilled soil. Flat enough that the checkerboard still reads underneath it.
+  const slab = new Mesh(geometry.groundSlab, materials.groundPrepared);
+  slab.receiveShadow = true;
+  slab.position.y = 0.005;
+  group.add(slab);
+
+  const crops: Mesh[] = [];
   for (const chunk of ORE_CHUNKS) {
-    const mesh = solid(geometry.oreChunk, materials.ore[resource]);
-    mesh.position.set(chunk.x, 0, chunk.z);
+    const mesh = solid(geometry.oreChunk, materials.ore.iron_ore);
+    mesh.position.set(chunk.x, 0.02, chunk.z);
     mesh.rotation.y = chunk.rotation;
-    mesh.scale.setScalar(chunk.scale);
     group.add(mesh);
-    chunks.push(mesh);
+    crops.push(mesh);
   }
 
   return {
     group,
-    setFill(ratio) {
-      const visible = Math.ceil(Math.max(0, Math.min(1, ratio)) * chunks.length);
-      chunks.forEach((mesh, index) => {
-        mesh.visible = index < visible;
+    setState(state, resource) {
+      slab.visible = state !== 'raw';
+
+      // Two half-sized chunks while it grows, four full ones when it is ripe:
+      // the tile says at a glance whether walking over there is worth a tick.
+      const shown = state === 'ripe' ? crops.length : state === 'growing' ? 2 : 0;
+      const scale = state === 'ripe' ? 1 : 0.5;
+      const material = resource === null ? materials.ore.iron_ore : materials.ore[resource];
+
+      crops.forEach((mesh, index) => {
+        mesh.visible = index < shown;
+        if (!mesh.visible) return;
+        mesh.material = material;
+        mesh.scale.setScalar((ORE_CHUNKS[index]?.scale ?? 1) * scale);
       });
     },
   };
@@ -234,9 +261,14 @@ export function createMachine(
   materials: WorldMaterials,
   machine: MachineId,
 ): MachineView {
-  return machine === 'smelter'
-    ? createSmelter(geometry, materials)
-    : createAssembler(geometry, materials);
+  switch (machine) {
+    case 'smelter':
+      return createSmelter(geometry, materials);
+    case 'assembler':
+      return createAssembler(geometry, materials);
+    case 'seeder':
+      return createSeeder(geometry, materials);
+  }
 }
 
 function createSmelter(geometry: WorldGeometry, materials: WorldMaterials): MachineView {
@@ -312,6 +344,40 @@ function createAssembler(geometry: WorldGeometry, materials: WorldMaterials): Ma
     },
     animate(delta) {
       if (busy) gear.rotation.y += delta * 4;
+    },
+  };
+}
+
+/**
+ * A hopper with a stirrer and a spout aimed at the floor. It borrows the
+ * assembler's gear rather than owning a shape of its own — the two machines are
+ * meant to read as the same family of thing.
+ */
+function createSeeder(geometry: WorldGeometry, materials: WorldMaterials): MachineView {
+  const group = new Group();
+
+  const base = solid(geometry.machineBase, materials.metalDark);
+
+  const hopper = solid(geometry.seederHopper, materials.metal);
+  hopper.position.y = 0.34;
+
+  const spout = solid(geometry.seederSpout, materials.accent);
+  spout.position.set(0, 0.1, 0.28);
+
+  const stirrer = solid(geometry.assemblerGear, materials.gear);
+  stirrer.position.y = 0.76;
+
+  group.add(base, hopper, spout, stirrer);
+
+  let busy = false;
+  return {
+    group,
+    setBusy(next) {
+      busy = next;
+    },
+    animate(delta) {
+      // Slower than the assembler: this one is grinding, not cutting.
+      if (busy) stirrer.rotation.y += delta * 2.5;
     },
   };
 }

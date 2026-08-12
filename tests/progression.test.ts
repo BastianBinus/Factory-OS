@@ -36,10 +36,12 @@ describe('tables', () => {
     }
   });
 
-  it('gives the player exactly move, mine and print to start with', () => {
+  it('gives the player everything the growing cycle needs to start with', () => {
     const state = createInitialState();
     // The readers and reset() are never locked, so they are always in the list.
+    // The rest is the whole loop: clear, seed, wait for it, look, harvest.
     expect(unlockedCommands(state)).toEqual([
+      'clear',
       'credits',
       'inventory',
       'mine',
@@ -47,6 +49,8 @@ describe('tables', () => {
       'position',
       'print',
       'reset',
+      'scan',
+      'seed',
     ]);
   });
 
@@ -113,7 +117,7 @@ describe('shop', () => {
     const state = createInitialState();
 
     expect(purchaseBlocker(state, 'move')).toBe('already_owned');
-    expect(purchaseBlocker(state, 'scan')).toBe('mission_locked');
+    expect(purchaseBlocker(state, 'scan')).toBe('already_owned');
     expect(purchaseBlocker(state, 'sell')).toBe('too_expensive');
     expect(purchaseBlocker(state, 'craft')).toBe('unlock_locked');
   });
@@ -148,9 +152,11 @@ describe('shop', () => {
     expect(listed).not.toContain('move');
     expect(listed).not.toContain('mine');
     expect(listed).not.toContain('print');
+    expect(listed).not.toContain('scan');
+    expect(listed).not.toContain('cultivate');
 
     // A locked node stays on the shelf: seeing what comes next is the point.
-    expect(listed).toContain('scan');
+    expect(listed).toContain('scan_at');
     expect(listed).toContain('robot_2');
   });
 

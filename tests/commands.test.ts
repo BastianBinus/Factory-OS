@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { craft, drop, mine, move, scan, scanAt, sell, take } from '../src/engine/commands';
-import { ORE_NODE_AMOUNT } from '../src/game/GameState';
+import { clear, craft, drop, mine, move, scan, scanAt, seed, sell, take } from '../src/engine/commands';
+import { BASE_YIELD, purityFor } from '../src/game/cultivation';
 import {
   ctxOf,
   expectFail,
   expectOk,
+  groundAt,
   idle,
   machineAt,
-  oreAt,
   robotOf,
   runTick,
   stateFromLayout,
@@ -57,49 +57,34 @@ describe('move', () => {
 });
 
 describe('mine', () => {
-  it('takes one unit per tick', () => {
+  it('harvests the ripe patch the layout put there', () => {
     const state = stateFromLayout(LAYOUT, 2, 0);
 
     expectOk(runTick(state, mine));
 
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 1 });
-    expect(oreAt(state, 2, 0).amount).toBe(ORE_NODE_AMOUNT - 1);
-    expect(state.stats.oreMined).toBe(1);
+    expect(robotOf(state).inventory).toEqual({ iron_ore: BASE_YIELD, seed_crystal: 1 });
+    expect(groundAt(state, 2, 0).state).toBe('raw');
+    expect(state.stats.oreMined).toBe(BASE_YIELD);
   });
 
-  it('fails on a tile without ore', () => {
+  it('fails on ground with nothing planted on it', () => {
     const state = stateFromLayout(LAYOUT, 1, 1);
     expect(expectFail(runTick(state, mine)).code).toBe('nothing_here');
   });
 
-  it('schedules regrowth when a node runs dry and refills it later', () => {
+  it('comes back around: harvest, clear, seed, wait, harvest again', () => {
     const state = stateFromLayout(LAYOUT, 2, 0);
-    state.inventoryCapacity = 100;
-    state.oreRegrowTicks = 5;
-    oreAt(state, 2, 0).amount = 1;
+    state.inventoryCapacity = 50;
 
-    runTick(state, mine);
-    const node = oreAt(state, 2, 0);
-    expect(node.amount).toBe(0);
-    expect(node.regrowAt).toBe(state.tick + 5);
+    expectOk(runTick(state, mine));
+    expectOk(runTick(state, clear));
+    expectOk(runTick(state, (ctx) => seed(ctx, 'iron_ore')));
+    idle(state, 8);
 
-    expect(expectFail(runTick(state, mine)).code).toBe('depleted');
+    expectOk(runTick(state, mine));
 
-    idle(state, 6);
-    expect(oreAt(state, 2, 0).amount).toBe(ORE_NODE_AMOUNT);
-    expect(oreAt(state, 2, 0).regrowAt).toBeNull();
-  });
-
-  it('stops at the carrying capacity', () => {
-    const state = stateFromLayout(LAYOUT, 2, 0);
-    state.inventoryCapacity = 2;
-
-    runTick(state, mine);
-    runTick(state, mine);
-    const result = expectFail(runTick(state, mine));
-
-    expect(result.code).toBe('inventory_full');
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 2 });
+    // Two harvests of iron; the crystal from the first one paid for the seeding.
+    expect(robotOf(state).inventory).toEqual({ iron_ore: BASE_YIELD * 2, seed_crystal: 1 });
   });
 });
 
@@ -240,11 +225,14 @@ describe('scan', () => {
   it('describes the tile under the robot', () => {
     const state = stateFromLayout(LAYOUT, 2, 0);
     expect(expectOk(runTick(state, scan)).value).toEqual({
-      type: 'ore',
+      type: 'ground',
       x: 2,
       y: 0,
+      state: 'ripe',
       resource: 'iron_ore',
-      amount: ORE_NODE_AMOUNT,
+      ripeIn: 0,
+      yield: BASE_YIELD,
+      purity: purityFor(2, 0, 0),
     });
   });
 

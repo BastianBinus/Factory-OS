@@ -1,7 +1,8 @@
 # Factory OS
 
 A coding game that teaches JavaScript. You write real code in a real editor, and it drives a robot
-through a 3D factory: mine ore, smelt it into ingots, assemble parts, sell them, buy upgrades.
+through a 3D factory: clear ground, plant ore, harvest it, smelt it into ingots, assemble parts,
+sell them, buy upgrades.
 
 Every unlock deliberately introduces one new language concept — loops, conditions, functions,
 arrays, objects, `async`/`await` — explained in a short panel with a runnable example. Inspired by
@@ -9,8 +10,9 @@ arrays, objects, `async`/`await` — explained in a short panel with a runnable 
 
 ## Status
 
-**Phase 8 of 8 — it teaches, it ships, and it now remembers you.** Press `E` for the editor, write
-`while (true) { await move('north'); await mine(); }` and hit `Ctrl+Enter`. The line the robot is
+**Phase 10a of 10 — the factory grows what it uses.** Press `E` for the editor, uncomment the
+starter script and hit `Ctrl+Enter`: the robot walks to a ripe patch, harvests it, and replants it
+with the seed crystal the harvest paid for. The line the robot is
 executing lights up in tick rhythm, the HUD shows credits and cargo, and the console under the
 editor carries `print()` output and errors with a clickable line number. Errors are translated:
 a forgotten `await` and a command you have not unlocked both explain themselves instead of
@@ -20,6 +22,13 @@ Selling pays. `Missions` shows the chain you are working through and `Shop` turn
 commands, a faster clock, a bigger robot and more factory floor — a bought command autocompletes in
 the editor immediately. The game saves itself, so a reload puts you back where you were.
 `Esc` closes a panel or stops the script, `Reset` puts the floor back without touching what you earned.
+
+Nothing in the factory refills itself. A tile of ground goes raw → prepared → growing → ripe and
+back to raw, and every step except the growing is a command your script has to issue. Harvesting a
+ripe tile hands back the crop and one seed crystal, so replanting what you just took costs nothing
+— but growing the *field* means crafting more crystals in the seeder, out of ore you could have
+sold. Crops of the same kind next to each other yield more, which makes the shape of your field
+something worth thinking about.
 
 A new player is not dropped into an empty editor. A three-step tutorial waits by the bottom-left
 corner — open the editor, write a line, run it — and each step waits for the thing itself to happen
@@ -37,6 +46,7 @@ network and that is worth explaining.
 
 ```bash
 npm install
+npx playwright install chromium   # once, for the end-to-end tests
 npm run dev          # http://localhost:5173
 ```
 
@@ -53,6 +63,11 @@ type step and component in both themes.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test` | Vitest, single run |
 | `npm run test:watch` | Vitest in watch mode |
+| `npm run test:e2e` | Playwright end-to-end tests (starts the dev server itself) |
+| `npm run test:e2e:headed` | Same, in a visible browser |
+
+The end-to-end tests run against Chromium only and drive one shared dev server, so they run
+serially — `npx playwright install chromium` must have been run once first.
 
 A phase is only done when typecheck, tests and build all pass, and the browser check for that
 phase has been done by hand.
@@ -114,7 +129,7 @@ Settings → Environment Variables. They are read at build time, so a change nee
 
 ```
 src/
-  game/        the rules: types, GameState, grid, resources, recipes,
+  game/        the rules: types, GameState, grid, resources, recipes, cultivation,
                economy, progression, concepts, saveLoad — plain data, no DOM
   engine/      the clock and the bridge to the workers: TickScheduler, ActionQueue,
                ScriptRunner (worker lifecycle + watchdog), Fleet (one runner per
@@ -138,6 +153,7 @@ src/
   styleguide.ts  living styleguide page
 supabase/migrations/  the schema, exactly as applied
 tests/         Vitest suites for the headless game logic
+e2e/           Playwright tests: boot, save migration, the worker-seam cultivation loop
 ```
 
 `src/style/tokens.css` defines both the interface palette and the `--w-*` world colours. The
@@ -204,6 +220,9 @@ themes recolours the factory without a second colour table.
 - **The cloud is additive, never authoritative.** Every write goes to localStorage first and to the
   network afterwards, so a failed request leaves the cloud stale rather than the factory gone. The
   timer-driven upload fails silently on purpose; only the deliberate moments report.
+- **Nothing regrows for free.** The world's only autonomous act is a crop whose tick has come
+  turning ripe, and something had to plant it first. There is no ore node that refills on a timer,
+  which means the ceiling on production is the script, not the map — the whole point of the game.
 
 ## Tech
 
@@ -223,7 +242,7 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 7 | Polish and deploy to Vercel | done |
 | 8 | Supabase: auth, cloud saves, conflict resolution | done |
 | 9a | A worker per robot: the second robot actually runs the script | done |
-| 10a | Cultivation core: clear, seed, grow, mine — nothing regrows free | designed |
+| 10a | Cultivation core: clear, seed, grow, mine — nothing regrows free | done |
 | 10b | Resources become the currency; credits and the mission chain removed | designed |
 | 10c | Throughput meter and bottleneck graphs (absorbs 9c) | designed |
 | 10d | Calibration and sorting bay — the first mandatory algorithms | designed |

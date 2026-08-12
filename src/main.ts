@@ -2,7 +2,7 @@ import './style/index';
 import './boot.css';
 import { initTheme, onThemeChange } from './ui/ThemeToggle';
 import { ONBOARDING_DONE, primaryRobot, resetWorld } from './game/GameState';
-import type { GameState, UnlockId } from './game/types';
+import type { GameState, GroundTile, UnlockId } from './game/types';
 import { buyUnlock, evaluateMissions, getUnlock, unlockedCommands } from './game/progression';
 import { cloudConcepts, markConceptSeen, unseenConcepts } from './game/concepts';
 import { loadOrCreate, localSavedAt, saveGame } from './game/saveLoad';
@@ -733,14 +733,27 @@ function paintTooltip(info: HoverInfo | null): void {
 function describeHoveredTile(info: HoverInfo): string {
   const tile = info.tile;
   switch (tile.kind) {
-    case 'ore':
-      return `${tile.resource} (${tile.amount})`;
+    case 'ground':
+      return describeGround(tile);
     case 'machine':
       return tile.job === null ? tile.machine : `${tile.machine}, running`;
     case 'market':
       return 'market';
     default:
-      return 'floor';
+      return 'unknown tile';
+  }
+}
+
+function describeGround(tile: GroundTile): string {
+  switch (tile.state) {
+    case 'raw':
+      return 'raw ground — clear() it';
+    case 'prepared':
+      return 'prepared — seed() it';
+    case 'growing':
+      return `${tile.resource ?? 'crop'}, growing`;
+    case 'ripe':
+      return `${tile.resource ?? 'crop'}, ripe (${tile.yield})`;
   }
 }
 
@@ -786,8 +799,11 @@ document.addEventListener('keydown', (event) => {
     return;
   }
 
-  // A bare letter must never steal a keystroke from the editor.
+  // A bare letter must never steal a keystroke from the editor. Opening the
+  // panel focuses the editor synchronously, so without this the same 'e' that
+  // opened it would land as the first character of the script.
   if (!typing && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'e') {
+    event.preventDefault();
     codePanel.toggle();
   }
 });

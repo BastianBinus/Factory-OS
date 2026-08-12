@@ -3,24 +3,26 @@ import type {
   CommandResult,
   Direction,
   GameState,
+  GroundTile,
   Inventory,
   MachineTile,
   Robot,
   Tile,
 } from '../game/types';
-import { inBounds, isDirection, regrowOre, step, tileAt } from '../game/grid';
+import { inBounds, isDirection, step, tileAt } from '../game/grid';
 import {
   RESOURCE_IDS,
   addItems,
   cloneInventory,
   describeInventory,
   isEmpty,
+  isResourceId,
   removeItems,
   totalItems,
 } from '../game/resources';
 import { findRunnableRecipe, getRecipe, recipesFor } from '../game/recipes';
 import { sellAll } from '../game/economy';
-import { ORE_NODE_AMOUNT } from '../game/GameState';
+import { GROW_TICKS, isSeedable, purityFor, ripen, yieldFor } from '../game/cultivation';
 
 /**
  * Every command costs exactly one tick and mutates `state` in place. They import
@@ -76,28 +78,107 @@ export function move(ctx: CommandContext, direction: unknown): CommandResult {
   return ok(null, `moved ${direction} to ${target.x},${target.y}`);
 }
 
-export function mine(ctx: CommandContext): CommandResult {
+export function clear(ctx: CommandContext): CommandResult {
   const tile = currentTile(ctx);
 
-  if (!tile || tile.kind !== 'ore') {
-    return fail('nothing_here', 'There is no ore on this tile.');
+  if (!tile || tile.kind !== 'ground') {
+    return fail('nothing_here', 'clear() only works on open ground.');
   }
-  if (tile.amount <= 0) {
-    return fail('depleted', 'This ore node is empty and still regrowing.');
-  }
-  if (freeCapacity(ctx) <= 0) {
-    return fail('inventory_full', `The robot is carrying ${totalItems(ctx.robot.inventory)} items and cannot hold more.`);
+  if (tile.state !== 'raw') {
+    return fail('bad_argument', `This ground is already ${tile.state}.`);
   }
 
-  tile.amount -= 1;
-  addItems(ctx.robot.inventory, tile.resource, 1);
-  ctx.state.stats.oreMined += 1;
+  tile.state = 'prepared';
 
-  if (tile.amount === 0) {
-    tile.regrowAt = ctx.state.tick + ctx.state.oreRegrowTicks;
+  return ok(null, 'cleared the ground');
+}
+
+export function seed(ctx: CommandContext, resource: unknown): CommandResult {
+  const tile = currentTile(ctx);
+
+  if (!tile || tile.kind !== 'ground') {
+    return fail('nothing_here', 'seed() only works on open ground.');
+  }
+  if (tile.state !== 'prepared') {
+    return fail(
+      'bad_argument',
+      tile.state === 'raw'
+        ? 'This ground has to be cleared before it can be seeded.'
+        : `This ground is already ${tile.state}.`,
+    );
+  }
+  if (!isResourceId(resource) || !isSeedable(resource)) {
+    return fail(
+      'bad_argument',
+      `seed() needs 'iron_ore' or 'copper_ore' — got ${JSON.stringify(resource)}.`,
+    );
+  }
+  if ((ctx.robot.inventory['seed_crystal'] ?? 0) < 1) {
+    return fail(
+      'missing_input',
+      'The robot has no seed crystal. The seeder makes one from 2 iron ore.',
+    );
   }
 
-  return ok(tile.resource, `mined ${tile.resource}`);
+  removeItems(ctx.robot.inventory, 'seed_crystal', 1);
+
+  tile.state = 'growing';
+  tile.resource = resource;
+  tile.ripeAt = ctx.state.tick + (GROW_TICKS[resource] ?? 0);
+  // Both are settled now rather than at harvest, so a player can read a field
+  // and know what it is worth before waiting for it.
+  tile.yield = yieldFor(ctx.state.grid, ctx.robot.x, ctx.robot.y, resource);
+  tile.purity = purityFor(ctx.robot.x, ctx.robot.y, ctx.state.tick);
+
+  return ok(resource, `seeded ${resource}`);
+}
+
+export function mine(ctx: CommandContext): CommandResult {
+  const tile = currentTile(ctx);
+  if (tile?.kind === 'ground') return harvest(ctx, tile);
+  return fail('nothing_here', 'The robot is not standing on ground it can harvest.');
+}
+
+/**
+ * A ripe tile is emptied in a single tick. That is the whole reward for planning
+ * ahead: the waiting happened while the robot was somewhere else being useful,
+ * and collecting it costs the same one tick as walking a step.
+ *
+ * The seed crystal that comes with it is what makes replanting the same tile
+ * free. Growing the *field* still costs crystals, which have to be crafted.
+ */
+function harvest(ctx: CommandContext, tile: GroundTile): CommandResult {
+  if (tile.state === 'growing') {
+    const ticks = tile.ripeAt === null ? 0 : Math.max(0, tile.ripeAt - ctx.state.tick);
+    return fail('not_ready', `This crop is still growing — ${ticks} ticks to go.`);
+  }
+  if (tile.state !== 'ripe' || tile.resource === null) {
+    return fail(
+      'nothing_here',
+      'There is nothing to harvest here. Use clear() and then seed() to plant something.',
+    );
+  }
+
+  const haul = tile.yield;
+  if (freeCapacity(ctx) < haul + 1) {
+    return fail(
+      'inventory_full',
+      `A harvest is ${haul} ${tile.resource} plus 1 seed crystal, and the robot has room for ${freeCapacity(ctx)}.`,
+    );
+  }
+
+  const resource = tile.resource;
+  addItems(ctx.robot.inventory, resource, haul);
+  addItems(ctx.robot.inventory, 'seed_crystal', 1);
+  ctx.state.stats.oreMined += haul;
+
+  tile.state = 'raw';
+  tile.resource = null;
+  tile.ripeAt = null;
+  tile.yield = 0;
+  tile.purity = 0;
+
+  return ok(resource, `harvested ${haul} ${resource} and 1 seed crystal`);
 }
 
 export function drop(ctx: CommandContext): CommandResult {
@@ -247,8 +328,17 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
   if (!tile) return { type: 'void', x, y };
 
   switch (tile.kind) {
-    case 'ore':
-      return { type: 'ore', x, y, resource: tile.resource, amount: tile.amount };
+    case 'ground':
+      return {
+        type: 'ground',
+        x,
+        y,
+        state: tile.state,
+        resource: tile.resource,
+        ripeIn: tile.ripeAt === null ? 0 : Math.max(0, tile.ripeAt - state.tick),
+        yield: tile.yield,
+        purity: tile.purity,
+      };
     case 'machine':
       return {
         type: 'machine',
@@ -263,13 +353,13 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
     case 'market':
       return { type: 'market', x, y };
     default:
-      return { type: 'floor', x, y };
+      return { type: 'unknown', x, y };
   }
 }
 
 /**
  * World simulation that runs once per tick, independent of what any robot does:
- * machines finish their jobs and depleted ore nodes refill.
+ * machines finish their jobs and crops that have had their time turn ripe.
  */
 export function advanceWorld(state: GameState): void {
   for (const tile of state.grid.tiles) {
@@ -284,5 +374,5 @@ export function advanceWorld(state: GameState): void {
     tile.job = null;
   }
 
-  regrowOre(state.grid, state.tick, ORE_NODE_AMOUNT);
+  ripen(state);
 }

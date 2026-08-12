@@ -1,14 +1,13 @@
-import type { GameState, Grid, Robot, Tile, UnlockId } from './types';
+import type { GameState, Grid, GroundTile, ResourceId, Robot, Tile, UnlockId } from './types';
 import { expandGrid } from './grid';
+import { BASE_YIELD, purityFor } from './cultivation';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
-export const ORE_NODE_AMOUNT = 20;
 export const DEFAULT_TICK_RATE_MS = 400;
 export const DEFAULT_CAPACITY = 10;
-export const DEFAULT_REGROW_TICKS = 30;
 
-export const STARTING_UNLOCKS: UnlockId[] = ['move', 'mine', 'print'];
+export const STARTING_UNLOCKS: UnlockId[] = ['move', 'mine', 'print', 'scan', 'cultivate'];
 
 /** Steps of the opening tutorial; anything at or above this means it is over. */
 export const ONBOARDING_DONE = 3;
@@ -18,6 +17,11 @@ export const ONBOARDING_DONE = 3;
  * tutorial asks them to write the first live line themselves, and a starter
  * script that already runs would take that away — and make the second tutorial
  * step complete itself before they had typed anything.
+ *
+ * Uncommented, it shuttles between the two iron patches and replants both. It
+ * runs correctly for two round trips and then stops on a full inventory, which
+ * is the first moment the game asks for a better program rather than a longer
+ * one. That is the intended lesson, not an oversight.
  */
 export const STARTER_SCRIPT = `// This is your script. It drives the robot in the factory
 // behind this panel, and it runs from top to bottom.
@@ -26,32 +30,62 @@ export const STARTER_SCRIPT = `// This is your script. It drives the robot in th
 // It hands back a promise instead of a result, so you write
 // 'await' in front of it to wait for the robot to finish.
 //
-// Remove the // in front of the four lines below, then press
+// Nothing in this factory refills itself. You harvest a patch,
+// clear it and seed it again - that cycle is the whole game.
+//
+// Remove the // in front of the lines below, then press
 // Ctrl+Enter to run it.
 
 // while (true) {
-//   await move('south');
 //   await mine();
+//   await clear();
+//   await seed('iron_ore');
+//
+//   // Walk to the other iron patch while this one grows.
+//   await move('south');
+//   await move('south');
+//   await move('south');
+//   await move('south');
+//   await move('south');
+//
+//   await mine();
+//   await clear();
+//   await seed('iron_ore');
+//
+//   await move('north');
+//   await move('north');
+//   await move('north');
+//   await move('north');
+//   await move('north');
 // }
 `;
 
 /**
  * The opening factory floor. One character per tile:
- *   M market · S smelter · A assembler · I iron ore · C copper ore · . empty
+ *   M market · S smelter · A assembler · D seeder
+ *   I ripe iron · C ripe copper · . raw ground
  * Row 0 is the north edge.
+ *
+ * Exported because the save migration rebuilds a pre-cultivation grid from it —
+ * a v1 save has ore tiles that no longer exist, and handing the player a blank
+ * field with no machines and no ripe patch would be a save they cannot play.
+ *
+ * The three ripe patches are the seed capital. Without at least one, the very
+ * first mine() has nothing to harvest, no crystal ever exists, and seed() can
+ * never be called: the whole loop fails to start.
  */
-const INITIAL_LAYOUT = [
+export const INITIAL_LAYOUT = [
   'M.......',
-  '..I..I..',
+  '.I......',
   '........',
   '...SA...',
-  '..I...C.',
+  '..D.....',
   '........',
-  '.C....I.',
+  '.I....C.',
   '........',
 ];
 
-function tileFromChar(char: string): Tile {
+function tileFromChar(char: string, x: number, y: number): Tile {
   switch (char) {
     case 'M':
       return { kind: 'market' };
@@ -59,13 +93,30 @@ function tileFromChar(char: string): Tile {
       return { kind: 'machine', machine: 'smelter', input: {}, output: {}, job: null };
     case 'A':
       return { kind: 'machine', machine: 'assembler', input: {}, output: {}, job: null };
+    case 'D':
+      return { kind: 'machine', machine: 'seeder', input: {}, output: {}, job: null };
     case 'I':
-      return { kind: 'ore', resource: 'iron_ore', amount: ORE_NODE_AMOUNT, regrowAt: null };
+      return ripeGround('iron_ore', x, y);
     case 'C':
-      return { kind: 'ore', resource: 'copper_ore', amount: ORE_NODE_AMOUNT, regrowAt: null };
+      return ripeGround('copper_ore', x, y);
     default:
-      return { kind: 'floor' };
+      return rawGround();
   }
+}
+
+export function rawGround(): GroundTile {
+  return { kind: 'ground', state: 'raw', resource: null, ripeAt: null, yield: 0, purity: 0 };
+}
+
+function ripeGround(resource: ResourceId, x: number, y: number): GroundTile {
+  return {
+    kind: 'ground',
+    state: 'ripe',
+    resource,
+    ripeAt: null,
+    yield: BASE_YIELD,
+    purity: purityFor(x, y, 0),
+  };
 }
 
 export function gridFromLayout(layout: string[]): Grid {
@@ -79,7 +130,7 @@ export function gridFromLayout(layout: string[]): Grid {
       throw new Error(`Layout row ${y} has length ${row.length}, expected ${width}`);
     }
     for (let x = 0; x < width; x += 1) {
-      tiles.push(tileFromChar(row[x] ?? '.'));
+      tiles.push(tileFromChar(row[x] ?? '.', x, y));
     }
   }
 
@@ -124,7 +175,6 @@ export function createInitialState(): GameState {
     script: STARTER_SCRIPT,
     tickRateMs: DEFAULT_TICK_RATE_MS,
     inventoryCapacity: DEFAULT_CAPACITY,
-    oreRegrowTicks: DEFAULT_REGROW_TICKS,
   };
 }
 
@@ -140,7 +190,7 @@ export function createInitialState(): GameState {
 export function resetWorld(state: GameState): void {
   // expandGrid is seeded by the grid size, so a rebuilt 12x12 is the same 12x12.
   const size = Math.max(state.grid.width, state.grid.height);
-  state.grid = expandGrid(gridFromLayout(INITIAL_LAYOUT), size, ORE_NODE_AMOUNT);
+  state.grid = expandGrid(gridFromLayout(INITIAL_LAYOUT), size);
 
   state.robots.forEach((robot, index) => {
     const start = startPosition(index);

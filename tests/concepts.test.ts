@@ -80,13 +80,10 @@ describe('what the player has reached', () => {
 
   it('adds a concept when the unlock carrying it is bought', () => {
     const state = createInitialState();
-    state.stats.tilesMoved = 20;
-    state.stats.oreMined = 15;
-    evaluateMissions(state); // m2 is what scan() waits for
     state.credits = 1000;
 
     expect(ids(reachedConcepts(state))).not.toContain('if_else');
-    buyUnlock(state, 'scan');
+    buyUnlock(state, 'scan_at'); // scanAt is what if_else now hangs on
     expect(ids(reachedConcepts(state))).toContain('if_else');
   });
 

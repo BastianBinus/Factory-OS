@@ -1,24 +1,12 @@
 import type { Inventory, ResourceDef, ResourceId } from './types';
 
 export const RESOURCES: Record<ResourceId, ResourceDef> = {
-  iron_ore: { id: 'iron_ore', label: 'Iron ore', colorToken: 'w-ore-iron', sellPrice: 3 },
-  copper_ore: { id: 'copper_ore', label: 'Copper ore', colorToken: 'w-ore-copper', sellPrice: 3 },
-  iron_ingot: { id: 'iron_ingot', label: 'Iron ingot', colorToken: 'w-ingot-iron', sellPrice: 11 },
-  copper_ingot: {
-    id: 'copper_ingot',
-    label: 'Copper ingot',
-    colorToken: 'w-ingot-copper',
-    sellPrice: 11,
-  },
-  gear: { id: 'gear', label: 'Gear', colorToken: 'w-gear', sellPrice: 40 },
-  seed_crystal: {
-    id: 'seed_crystal',
-    label: 'Seed crystal',
-    colorToken: 'w-seed-crystal',
-    // Priced at what its inputs are worth, so selling a crystal is never a
-    // loss and never a trick. sell() disappears in 10b and takes this with it.
-    sellPrice: 6,
-  },
+  iron_ore: { id: 'iron_ore', label: 'Iron ore', colorToken: 'w-ore-iron' },
+  copper_ore: { id: 'copper_ore', label: 'Copper ore', colorToken: 'w-ore-copper' },
+  iron_ingot: { id: 'iron_ingot', label: 'Iron ingot', colorToken: 'w-ingot-iron' },
+  copper_ingot: { id: 'copper_ingot', label: 'Copper ingot', colorToken: 'w-ingot-copper' },
+  gear: { id: 'gear', label: 'Gear', colorToken: 'w-gear' },
+  seed_crystal: { id: 'seed_crystal', label: 'Seed crystal', colorToken: 'w-seed-crystal' },
 };
 
 export const RESOURCE_IDS = Object.keys(RESOURCES) as ResourceId[];

@@ -46,6 +46,7 @@ network and that is worth explaining.
 
 ```bash
 npm install
+npx playwright install chromium   # once, for the end-to-end tests
 npm run dev          # http://localhost:5173
 ```
 
@@ -62,6 +63,11 @@ type step and component in both themes.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test` | Vitest, single run |
 | `npm run test:watch` | Vitest in watch mode |
+| `npm run test:e2e` | Playwright end-to-end tests (starts the dev server itself) |
+| `npm run test:e2e:headed` | Same, in a visible browser |
+
+The end-to-end tests run against Chromium only and drive one shared dev server, so they run
+serially — `npx playwright install chromium` must have been run once first.
 
 A phase is only done when typecheck, tests and build all pass, and the browser check for that
 phase has been done by hand.
@@ -147,6 +153,7 @@ src/
   styleguide.ts  living styleguide page
 supabase/migrations/  the schema, exactly as applied
 tests/         Vitest suites for the headless game logic
+e2e/           Playwright tests: boot, save migration, the worker-seam cultivation loop
 ```
 
 `src/style/tokens.css` defines both the interface palette and the `--w-*` world colours. The

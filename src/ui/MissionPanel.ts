@@ -52,13 +52,15 @@ export class MissionPanel {
       ...(options.onToggle ? { onToggle: options.onToggle } : {}),
     });
 
-    const list = document.createElement('ol');
-    list.className = 'drawer__list';
+    // The dependency graph is a forest of linear chains — every unlock has at
+    // most one prerequisite — so it draws as a real tree: each root starts a
+    // branch, and its single descendant chain hangs off it, indented and wired
+    // with an elbow connector. A flat list threw that structure away.
+    const tree = document.createElement('ul');
+    tree.className = 'tree';
 
-    for (const unlock of UNLOCKS) {
-      const row = buildRow(unlock);
-      this.rows.push(row);
-      list.appendChild(row.root);
+    for (const root of UNLOCKS.filter((unlock) => !unlock.requiresUnlocks?.length)) {
+      tree.appendChild(this.buildBranch(root));
     }
 
     this.conceptSection = document.createElement('div');
@@ -80,7 +82,27 @@ export class MissionPanel {
     }
 
     this.conceptSection.append(heading, conceptList);
-    this.drawer.body.append(list, this.conceptSection);
+    this.drawer.body.append(tree, this.conceptSection);
+  }
+
+  /** A node, then its single descendant chain nested and wired beneath it. */
+  private buildBranch(unlock: UnlockDef): HTMLLIElement {
+    const li = document.createElement('li');
+    li.className = 'tree__node';
+
+    const card = buildCard(unlock);
+    this.rows.push(card);
+    li.appendChild(card.root);
+
+    const child = UNLOCKS.find((other) => other.requiresUnlocks?.includes(unlock.id));
+    if (child) {
+      const kids = document.createElement('ul');
+      kids.className = 'tree__kids';
+      kids.appendChild(this.buildBranch(child));
+      li.appendChild(kids);
+    }
+
+    return li;
   }
 
   get isOpen(): boolean {
@@ -126,8 +148,8 @@ function statusWord(owned: boolean, blocker: ReturnType<typeof purchaseBlocker>)
   return 'Saving';
 }
 
-function buildRow(unlock: UnlockDef): Row {
-  const root = document.createElement('li');
+function buildCard(unlock: UnlockDef): Row {
+  const root = document.createElement('div');
   root.className = 'mission';
   root.dataset['unlock'] = unlock.id;
 

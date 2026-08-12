@@ -137,7 +137,7 @@ async function calibrate(names: string[], command: string): Promise<void> {
 
 /** A blocking command is needed to probe with; `move` is there from the start. */
 function probeCommand(names: string[]): string | null {
-  const usable = names.filter((name) => !['print', 'position', 'inventory', 'credits', 'wait'].includes(name));
+  const usable = names.filter((name) => !['print', 'position', 'inventory', 'wait'].includes(name));
   return usable.includes('move') ? 'move' : (usable[0] ?? null);
 }
 
@@ -150,7 +150,6 @@ const EMPTY_SNAPSHOT: StateSnapshot = {
   y: 0,
   facing: 'south',
   inventory: {},
-  credits: 0,
   tick: 0,
 };
 

@@ -40,26 +40,28 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
   drop: { detail: 'await drop()', info: 'Load what the robot carries into the machine below it.' },
   craft: { detail: 'await craft()', info: 'Start the machine below the robot.' },
   take: { detail: 'await take()', info: 'Collect what the machine below the robot produced.' },
-  sell: { detail: 'await sell()', info: 'Sell everything the robot carries. Market tile only.' },
+  trade: {
+    detail: "await trade('iron_ore', 'copper_ore')",
+    info: 'Swap three of one ore for one of another. Market tile only.',
+  },
   wait: { detail: 'await wait(5)', info: 'Do nothing for a number of ticks.' },
   scan: { detail: 'await scan()', info: 'Read what is on the tile below the robot.' },
   scanAt: { detail: 'await scanAt(x, y)', info: 'Read any tile in the factory.' },
   print: { detail: 'print(value)', info: 'Write a value into the console. Costs no tick.' },
   position: { detail: 'position()', info: 'The robot position as {x, y}. Costs no tick.' },
   inventory: { detail: 'inventory()', info: 'What the robot carries. Costs no tick.' },
-  credits: { detail: 'credits()', info: 'Your credits right now. Costs no tick.' },
   me: {
     detail: 'me()',
     info: 'Which robot is running this copy of the script, as {id, index}. Costs no tick.',
   },
   reset: {
     detail: 'await reset()',
-    info: 'Put the floor back to the start: robot parked, ore full, machines empty. Your credits and unlocks stay. Costs no tick.',
+    info: 'Put the floor back to the start: robots parked, ripe patches full. What they carry, and your unlocks, stay. Costs no tick.',
   },
 };
 
 /** Commands that block are worth spelling out with their `await`. */
-const INSTANT = new Set(['print', 'position', 'inventory', 'credits', 'me']);
+const INSTANT = new Set(['print', 'position', 'inventory', 'me']);
 
 function completionsFor(commands: string[]): Completion[] {
   return commands.map((name) => {

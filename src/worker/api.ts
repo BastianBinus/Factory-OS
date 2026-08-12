@@ -36,7 +36,7 @@ export class ApiError extends Error {
 }
 
 /** Readers and `print` never reach the tick loop, everything else does. */
-const INSTANT = new Set(['print', 'position', 'inventory', 'credits', 'me']);
+const INSTANT = new Set(['print', 'position', 'inventory', 'me']);
 
 const MAX_WAIT_TICKS = 1000;
 
@@ -127,10 +127,6 @@ export function createApi(commands: readonly string[], host: ApiHost): Record<st
   if (commands.includes('inventory')) {
     // A copy: the player is free to mutate what they get back.
     api['inventory'] = (): Record<string, number> => ({ ...host.snapshot().inventory });
-  }
-
-  if (commands.includes('credits')) {
-    api['credits'] = (): number => host.snapshot().credits;
   }
 
   if (commands.includes('me')) {

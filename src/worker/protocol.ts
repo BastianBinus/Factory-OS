@@ -7,7 +7,7 @@
  * player can read without spending a tick.
  */
 
-/** What `position()`, `inventory()` and `credits()` answer from, between ticks. */
+/** What `position()` and `inventory()` answer from, between ticks. */
 export interface StateSnapshot {
   /**
    * Which robot this worker drives. Every robot runs its own copy of the same
@@ -21,7 +21,6 @@ export interface StateSnapshot {
   y: number;
   facing: string;
   inventory: Record<string, number>;
-  credits: number;
   tick: number;
 }
 

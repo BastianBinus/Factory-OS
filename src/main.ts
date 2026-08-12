@@ -799,8 +799,11 @@ document.addEventListener('keydown', (event) => {
     return;
   }
 
-  // A bare letter must never steal a keystroke from the editor.
+  // A bare letter must never steal a keystroke from the editor. Opening the
+  // panel focuses the editor synchronously, so without this the same 'e' that
+  // opened it would land as the first character of the script.
   if (!typing && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'e') {
+    event.preventDefault();
     codePanel.toggle();
   }
 });

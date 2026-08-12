@@ -12,14 +12,13 @@ export async function seedSave(page: Page, save: Record<string, unknown>): Promi
 }
 
 /**
- * Opens the script editor through the toolbar button rather than the `E`
- * shortcut.
+ * Opens the script editor with the `E` shortcut — the way a player does.
  *
- * The shortcut opens the panel and then types the `e` into the document it just
- * focused — `main.ts` does not call preventDefault() on that branch, and
- * `CodePanel.setOpen` focuses the editor synchronously. Until that is fixed,
- * every test that used the shortcut would be running a corrupted script.
+ * This deliberately exercises the shortcut rather than the toolbar button: the
+ * handler in `main.ts` calls preventDefault() before focusing the editor, so the
+ * `e` that opens the panel must not leak in as the first character of the
+ * script. A run after this that finds a stray `e` means that guard regressed.
  */
 export async function openEditor(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Code' }).click();
+  await page.locator('body').press('e');
 }

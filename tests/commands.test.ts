@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clear, craft, drop, mine, move, scan, scanAt, seed, sell, take } from '../src/engine/commands';
+import { clear, craft, drop, mine, move, scan, scanAt, seed, take, trade } from '../src/engine/commands';
 import { BASE_YIELD, purityFor } from '../src/game/cultivation';
 import {
   ctxOf,
@@ -197,27 +197,40 @@ describe('craft and take', () => {
   });
 });
 
-describe('sell', () => {
-  it('pays out on the market tile', () => {
+describe('trade', () => {
+  it('swaps three of one ore for one of another on the market', () => {
     const state = stateFromLayout(LAYOUT, 0, 0);
-    robotOf(state).inventory = { iron_ore: 2, gear: 1 };
+    robotOf(state).inventory = { iron_ore: 7 };
 
-    const result = expectOk(runTick(state, sell));
+    const result = expectOk(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore')));
 
-    expect(result.value).toBe(46);
-    expect(state.credits).toBe(46);
-    expect(robotOf(state).inventory).toEqual({});
+    // Seven ore trade in whole threes: two copper out, six iron gone, one left.
+    expect(result.value).toBe(2);
+    expect(robotOf(state).inventory).toEqual({ iron_ore: 1, copper_ore: 2 });
   });
 
   it('only works on the market', () => {
     const state = stateFromLayout(LAYOUT, 1, 1);
-    robotOf(state).inventory = { gear: 1 };
-    expect(expectFail(runTick(state, sell)).code).toBe('nothing_here');
+    robotOf(state).inventory = { iron_ore: 3 };
+    expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore'))).code).toBe(
+      'nothing_here',
+    );
   });
 
-  it('needs something to sell', () => {
+  it('needs at least three of the input', () => {
     const state = stateFromLayout(LAYOUT, 0, 0);
-    expect(expectFail(runTick(state, sell)).code).toBe('inventory_empty');
+    robotOf(state).inventory = { iron_ore: 2 };
+    expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore'))).code).toBe(
+      'missing_input',
+    );
+  });
+
+  it('refuses to trade a resource for itself', () => {
+    const state = stateFromLayout(LAYOUT, 0, 0);
+    robotOf(state).inventory = { iron_ore: 9 };
+    expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'iron_ore'))).code).toBe(
+      'bad_argument',
+    );
   });
 });
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { clear, craft, drop, mine, seed, sell, take } from '../src/engine/commands';
+import { clear, craft, drop, mine, seed, take } from '../src/engine/commands';
 import { createInitialState, hasUnlock } from '../src/game/GameState';
 import { GROW_TICKS } from '../src/game/cultivation';
-import { buyUnlock, evaluateMissions } from '../src/game/progression';
+import { totalResources } from '../src/game/economy';
+import { buyUnlock } from '../src/game/progression';
 import { deserialize, serialize } from '../src/game/saveLoad';
 import { expectOk, idle, machineAt, robotOf, runTick, stateFromLayout, walkTo } from './helpers';
 
@@ -60,25 +61,20 @@ describe('a full production round', () => {
     expect(robotOf(state).inventory).toEqual({ gear: 1, seed_crystal: 2 });
     expect(state.stats.crafted).toEqual({ iron_ingot: 3, copper_ingot: 3, gear: 1 });
 
-    // 5 — sell it, crystals included: 40 for the gear, 6 each for the crystals
-    walkTo(state, 0, 0);
-    expect(expectOk(runTick(state, sell)).value).toBe(52);
-    expect(state.credits).toBe(52);
-    expect(robotOf(state).inventory).toEqual({});
+    // 5 — there is no money: what the robot carries is the whole of its wealth.
+    expect(totalResources(state)).toEqual({ gear: 1, seed_crystal: 2 });
 
-    // 6 — the round was long enough to finish the first mission
-    expect(state.stats.tilesMoved).toBe(24);
-    const completed = evaluateMissions(state);
-    expect(completed.map((entry) => entry.mission.id)).toEqual(['m1_move']);
-    expect(hasUnlock(state, 'sell')).toBe(true);
-    expect(state.credits).toBe(92);
+    // 6 — a few rounds' worth of metal buys the first upgrade, paid straight out
+    // of the fleet's cargo. One round cannot fund it — that stall is the design —
+    // so the stock is topped up here to stand in for the rounds in between.
+    robotOf(state).inventory = { ...robotOf(state).inventory, iron_ingot: 10 };
+    expect(buyUnlock(state, 'capacity_20').ok).toBe(true);
+    expect(hasUnlock(state, 'capacity_20')).toBe(true);
+    expect(state.inventoryCapacity).toBe(20);
+    // The metal was spent, not merely checked: the ingots are gone.
+    expect(robotOf(state).inventory['iron_ingot'] ?? 0).toBe(0);
 
-    // 7 — spend the earnings
-    expect(buyUnlock(state, 'wait').ok).toBe(true);
-    expect(state.credits).toBe(12);
-    expect(hasUnlock(state, 'wait')).toBe(true);
-
-    // 8 — and the whole thing survives a save/load cycle
+    // 7 — and the whole thing survives a save/load cycle
     const reloaded = deserialize(serialize(state));
     expect(reloaded.ok).toBe(true);
     if (reloaded.ok) expect(reloaded.state).toEqual(state);

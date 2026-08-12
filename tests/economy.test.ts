@@ -1,72 +1,54 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialState } from '../src/game/GameState';
-import { canAfford, sellAll, sellPrice, spend, valueOf } from '../src/game/economy';
+import type { GameState, Inventory } from '../src/game/types';
+import { createInitialState, createRobot } from '../src/game/GameState';
+import { canAfford, missingResources, spendResources, totalResources } from '../src/game/economy';
 
-describe('prices', () => {
-  it('values a mixed inventory', () => {
-    expect(valueOf({ iron_ore: 3, gear: 2 })).toBe(3 * 3 + 2 * 40);
-  });
+/** A state whose fleet carries exactly the given inventories, one robot each. */
+function fleet(...inventories: Inventory[]): GameState {
+  const state = createInitialState();
+  state.robots = inventories.map((inventory, index) => ({
+    ...createRobot(`r${index + 1}`, index, 0),
+    inventory: { ...inventory },
+  }));
+  return state;
+}
 
-  it('values an empty inventory at zero', () => {
-    expect(valueOf({})).toBe(0);
-  });
-
-  it('pays more for processed goods', () => {
-    expect(sellPrice('iron_ingot')).toBeGreaterThan(sellPrice('iron_ore'));
-    expect(sellPrice('gear')).toBeGreaterThan(sellPrice('iron_ingot'));
-  });
-});
-
-describe('sellAll', () => {
-  it('empties the inventory and pays for it', () => {
-    const state = createInitialState();
-    const inventory = { iron_ore: 4, copper_ingot: 1 };
-
-    const sale = sellAll(state, inventory);
-
-    expect(sale.credits).toBe(4 * 3 + 11);
-    expect(sale.items).toBe(5);
-    expect(sale.sold).toEqual({ iron_ore: 4, copper_ingot: 1 });
-    expect(inventory).toEqual({});
-    expect(state.credits).toBe(sale.credits);
-    expect(state.stats.itemsSold).toBe(5);
-  });
-
-  it('tracks credits earned separately from the balance', () => {
-    const state = createInitialState();
-    sellAll(state, { gear: 1 });
-    spend(state, 30);
-
-    expect(state.credits).toBe(10);
-    expect(state.stats.creditsEarned).toBe(40);
-  });
-
-  it('handles selling nothing without touching the balance', () => {
-    const state = createInitialState();
-    state.credits = 50;
-
-    const sale = sellAll(state, {});
-
-    expect(sale.credits).toBe(0);
-    expect(state.credits).toBe(50);
+describe('totalResources', () => {
+  it('sums every robot inventory into one', () => {
+    const state = fleet({ iron_ore: 3 }, { iron_ore: 2, gear: 1 });
+    expect(totalResources(state)).toEqual({ iron_ore: 5, gear: 1 });
   });
 });
 
-describe('spending', () => {
-  it('refuses to go into debt', () => {
-    const state = createInitialState();
-    state.credits = 99;
-
-    expect(canAfford(state, 100)).toBe(false);
-    expect(spend(state, 100)).toBe(false);
-    expect(state.credits).toBe(99);
+describe('canAfford and missingResources', () => {
+  it('affords a cost the fleet covers exactly', () => {
+    const state = fleet({ iron_ingot: 10 });
+    expect(canAfford(state, { iron_ingot: 10 })).toBe(true);
+    expect(missingResources(state, { iron_ingot: 10 })).toEqual({});
   });
 
-  it('allows spending the last credit', () => {
-    const state = createInitialState();
-    state.credits = 100;
+  it('reports the shortfall on each resource that is short', () => {
+    const state = fleet({ iron_ingot: 4, gear: 1 });
+    expect(canAfford(state, { iron_ingot: 10, gear: 3 })).toBe(false);
+    expect(missingResources(state, { iron_ingot: 10, gear: 3 })).toEqual({ iron_ingot: 6, gear: 2 });
+  });
+});
 
-    expect(spend(state, 100)).toBe(true);
-    expect(state.credits).toBe(0);
+describe('spendResources', () => {
+  it('draws across robots in turn until the bill is met', () => {
+    const state = fleet({ iron_ore: 4 }, { iron_ore: 4 });
+
+    expect(spendResources(state, { iron_ore: 6 })).toBe(true);
+    expect(totalResources(state)).toEqual({ iron_ore: 2 });
+    // The first robot is drained before the second is touched.
+    expect(state.robots[0]?.inventory['iron_ore'] ?? 0).toBe(0);
+    expect(state.robots[1]?.inventory['iron_ore']).toBe(2);
+  });
+
+  it('refuses when the fleet is short and touches nothing', () => {
+    const state = fleet({ iron_ore: 5 });
+
+    expect(spendResources(state, { iron_ore: 6 })).toBe(false);
+    expect(totalResources(state)).toEqual({ iron_ore: 5 });
   });
 });

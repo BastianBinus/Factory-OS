@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ONBOARDING_DONE, SAVE_VERSION, createInitialState, hasUnlock } from '../src/game/GameState';
 import { deserialize, serialize } from '../src/game/saveLoad';
-import { buyUnlock, evaluateMissions, unlockedCommands } from '../src/game/progression';
+import { buyUnlock, unlockedCommands } from '../src/game/progression';
 
 function savedState(): Record<string, unknown> {
   return JSON.parse(serialize(createInitialState())) as Record<string, unknown>;
@@ -10,11 +10,10 @@ function savedState(): Record<string, unknown> {
 describe('round trip', () => {
   it('restores a state that is equal to the original', () => {
     const state = createInitialState();
-    state.credits = 1234;
     state.tick = 99;
     state.script = 'await move("north");';
-    state.unlocks = ['move', 'mine', 'print', 'sell'];
-    state.completedMissions = ['m1_move'];
+    state.unlocks = ['move', 'mine', 'print', 'scan'];
+    state.robots[0]!.inventory = { iron_ore: 5, gear: 2 };
     state.stats.crafted = { gear: 3 };
 
     const result = deserialize(serialize(state));
@@ -38,10 +37,10 @@ describe('a played state survives a reload', () => {
     const state = createInitialState();
     state.stats.tilesMoved = 20;
     state.stats.oreMined = 15;
-    evaluateMissions(state); // m1 and m2: rewards, and sell() plus wait() granted
+    // Enough metal on hand to buy a few upgrades outright.
+    state.robots[0]!.inventory = { iron_ore: 200, iron_ingot: 200, gear: 50 };
 
-    state.credits = 10_000;
-    buyUnlock(state, 'scan'); // a command
+    buyUnlock(state, 'scan_at'); // a command (scan itself is a free starter)
     buyUnlock(state, 'grid_12'); // a bigger world
     buyUnlock(state, 'tick_300'); // a faster clock
     buyUnlock(state, 'capacity_20'); // a bigger robot
@@ -50,7 +49,7 @@ describe('a played state survives a reload', () => {
     return state;
   }
 
-  it('brings back credits, unlocks, grid, script and mission state', () => {
+  it('brings back resources, unlocks, grid, script and stats', () => {
     const state = playedState();
     const result = deserialize(serialize(state));
 
@@ -58,8 +57,8 @@ describe('a played state survives a reload', () => {
     if (!result.ok) return;
     const loaded = result.state;
 
-    expect(loaded.credits).toBe(state.credits);
-    expect(loaded.completedMissions).toEqual(['m1_move', 'm2_mine']);
+    expect(loaded.robots[0]?.inventory).toEqual(state.robots[0]?.inventory);
+    expect(loaded.unlocks).toEqual(state.unlocks);
     expect(loaded.script).toBe(state.script);
     expect(loaded.grid.width).toBe(12);
     expect(loaded.grid.tiles).toHaveLength(144);
@@ -77,18 +76,7 @@ describe('a played state survives a reload', () => {
     // The worker builds its API from this list, so a name lost here is a script
     // that stops working purely because the player pressed reload.
     expect(unlockedCommands(loaded.state)).toEqual(unlockedCommands(playedState()));
-    expect(hasUnlock(loaded.state, 'scan')).toBe(true);
-  });
-
-  it('does not hand out a mission reward a second time after loading', () => {
-    const loaded = deserialize(serialize(playedState()));
-
-    expect(loaded.ok).toBe(true);
-    if (!loaded.ok) return;
-
-    const before = loaded.state.credits;
-    expect(evaluateMissions(loaded.state)).toHaveLength(0);
-    expect(loaded.state.credits).toBe(before);
+    expect(hasUnlock(loaded.state, 'scan_at')).toBe(true);
   });
 });
 
@@ -99,7 +87,7 @@ describe('rejecting broken saves', () => {
   });
 
   it('survives a half-written save', () => {
-    expect(deserialize('{"credits": 12')).toMatchObject({ ok: false, reason: 'unreadable' });
+    expect(deserialize('{"tick": 12')).toMatchObject({ ok: false, reason: 'unreadable' });
   });
 
   it('rejects JSON that is not a state object', () => {
@@ -145,7 +133,7 @@ describe('migration', () => {
     expect(result.state.seenConcepts).toEqual([]);
   });
 
-  it('keeps values an old save already had', () => {
+  it('turns the credits of an old save into ore at the old sell price', () => {
     const data = savedState();
     delete data['version'];
     data['credits'] = 777;
@@ -155,7 +143,8 @@ describe('migration', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.state.credits).toBe(777);
+    // 777 credits at the old price of three come back as 259 iron ore.
+    expect(result.state.robots[0]?.inventory['iron_ore']).toBe(259);
     expect(result.state.inventoryCapacity).toBe(20);
   });
 });
@@ -173,13 +162,12 @@ describe('the tutorial step', () => {
   });
 
   /*
-   * The important one. A save written before onboarding existed belongs to
-   * someone who has obviously already pressed Run, and it is still a perfectly
-   * good save — neither rejecting it nor restarting their tutorial is acceptable.
+   * A save written before onboarding existed belongs to someone who has
+   * obviously already pressed Run, and it is still a perfectly good save —
+   * neither rejecting it nor restarting their tutorial is acceptable.
    */
   it('counts as finished in a save written before the tutorial existed', () => {
     const data = savedState();
-    data['credits'] = 4000;
     delete data['onboardingStep'];
 
     const result = deserialize(JSON.stringify(data));
@@ -187,7 +175,6 @@ describe('the tutorial step', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.state.onboardingStep).toBe(ONBOARDING_DONE);
-    expect(result.state.credits).toBe(4000);
   });
 
   it('counts as finished when the saved value is nonsense', () => {
@@ -202,7 +189,7 @@ describe('the tutorial step', () => {
   });
 });
 
-describe('the cultivation migration', () => {
+describe('the cultivation and currency migrations', () => {
   /** A save exactly as version 1 wrote them: ore nodes, floor, oreRegrowTicks. */
   function version1Save(size: number): Record<string, unknown> {
     const data = savedState();
@@ -231,9 +218,6 @@ describe('the cultivation migration', () => {
     const grid = result.state.grid;
     expect(grid.width).toBe(12);
     expect(grid.tiles).toHaveLength(144);
-
-    // Phrased as an absence rather than a count, so that deleting the ore tile
-    // type in Task 12 leaves this assertion saying exactly what it says now.
     expect(grid.tiles.map((tile) => tile.kind)).not.toContain('ore');
 
     // The floor has to come back whole: three machines, a market, and something
@@ -254,7 +238,7 @@ describe('the cultivation migration', () => {
     expect(result.state.grid.tiles).toHaveLength(64);
   });
 
-  it('takes the floor and nothing else', () => {
+  it('converts credits to ore, drops missions, and removes sell — losing nothing else', () => {
     const data = version1Save(8);
     data['credits'] = 4200;
     data['unlocks'] = ['move', 'mine', 'print', 'sell'];
@@ -271,9 +255,16 @@ describe('the cultivation migration', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.state.credits).toBe(4200);
-    expect(result.state.completedMissions).toEqual(['m1_move']);
-    expect(result.state.stats.crafted).toEqual({ gear: 2 });
+    const loaded = result.state;
+
+    // 4200 / 3 = 1400 iron ore, handed to the first robot.
+    expect(loaded.robots[0]?.inventory['iron_ore']).toBe(1400);
+    // sell() no longer exists; the rest of the unlocks survive.
+    expect(loaded.unlocks).toEqual(['move', 'mine', 'print']);
+    // Missions and their bookkeeping are gone; the crafting tally stays.
+    expect((loaded as unknown as Record<string, unknown>)['completedMissions']).toBeUndefined();
+    expect(loaded.stats.crafted).toEqual({ gear: 2 });
+    expect((loaded.stats as unknown as Record<string, unknown>)['creditsEarned']).toBeUndefined();
   });
 
   it('leaves a save written by this build alone', () => {

@@ -8,7 +8,7 @@ import { SAVE_KEY, currentSave, version1Save } from './fixtures/saves';
  *
  * Getting that wrong is the worst failure the game has: it looks like a fresh
  * start, says so in one line of console text nobody reads, and cannot be undone.
- * These tests watch that line and the credits counter.
+ * These tests watch that line and the cargo the migration converts credits into.
  */
 
 const UPGRADED = 'Save loaded and upgraded from version 1.';
@@ -35,7 +35,9 @@ test('upgrades a pre-cultivation save without losing progress', async ({ page })
   await expect(page.locator('.console__line--system').filter({ hasText: UPGRADED })).toBeVisible();
 
   // The save is only migrated if what the player earned came through with it.
-  await expect(page.locator('.hud__credits')).toHaveText('777');
+  // 777 credits convert to 259 iron ore at the old price of three, on top of the
+  // 4 the robot was already carrying — so the cargo bar shows 263.
+  await expect(page.locator('.hud__cargo')).toContainText('263');
 
   await expect(page.locator('.console__line').filter({ hasText: UNREADABLE })).toHaveCount(0);
 });

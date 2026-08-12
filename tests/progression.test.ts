@@ -1,38 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import type { UnlockId } from '../src/game/types';
+import type { Inventory, UnlockId } from '../src/game/types';
 import { createInitialState, hasUnlock } from '../src/game/GameState';
 import {
-  MISSIONS,
   UNLOCKS,
-  activeMission,
   buyUnlock,
-  evaluateMissions,
   getUnlock,
   isPurchasable,
-  missionProgress,
+  nextUnlock,
   purchaseBlocker,
   unlockedCommands,
   visibleUnlocks,
 } from '../src/game/progression';
 
+/** Hand the starting robot a pile of resources to shop with. */
+function withResources(inventory: Inventory) {
+  const state = createInitialState();
+  state.robots[0]!.inventory = { ...inventory };
+  return state;
+}
+
+/** Enough of everything that only prerequisites, never affordability, can block a buy. */
+const RICH: Inventory = { iron_ore: 999, iron_ingot: 999, copper_ingot: 999, gear: 999 };
+
 describe('tables', () => {
-  it('has unique unlock and mission ids', () => {
-    const unlockIds = UNLOCKS.map((unlock) => unlock.id);
-    const missionIds = MISSIONS.map((mission) => mission.id);
-    expect(new Set(unlockIds).size).toBe(unlockIds.length);
-    expect(new Set(missionIds).size).toBe(missionIds.length);
+  it('has unique unlock ids', () => {
+    const ids = UNLOCKS.map((unlock) => unlock.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('only references unlocks and missions that exist', () => {
-    const unlockIds = new Set(UNLOCKS.map((unlock) => unlock.id));
-    const missionIds = new Set(MISSIONS.map((mission) => mission.id));
-
+  it('only requires unlocks that exist', () => {
+    const ids = new Set(UNLOCKS.map((unlock) => unlock.id));
     for (const unlock of UNLOCKS) {
-      for (const required of unlock.requiresUnlocks ?? []) expect(unlockIds.has(required)).toBe(true);
-      if (unlock.requiresMission) expect(missionIds.has(unlock.requiresMission)).toBe(true);
-    }
-    for (const mission of MISSIONS) {
-      for (const granted of mission.grants) expect(unlockIds.has(granted)).toBe(true);
+      for (const required of unlock.requiresUnlocks ?? []) expect(ids.has(required)).toBe(true);
     }
   });
 
@@ -42,7 +41,6 @@ describe('tables', () => {
     // The rest is the whole loop: clear, seed, wait for it, look, harvest.
     expect(unlockedCommands(state)).toEqual([
       'clear',
-      'credits',
       'inventory',
       'mine',
       'move',
@@ -59,96 +57,41 @@ describe('tables', () => {
   });
 });
 
-describe('missions', () => {
-  it('starts on the first mission', () => {
-    expect(activeMission(createInitialState())?.id).toBe('m1_move');
-  });
-
-  it('caps reported progress at the target', () => {
-    const state = createInitialState();
-    state.stats.tilesMoved = 500;
-    expect(missionProgress(state, MISSIONS[0]!)).toMatchObject({ current: 20, complete: true });
-  });
-
-  it('counts crafted goods per resource', () => {
-    const state = createInitialState();
-    state.stats.crafted = { iron_ingot: 4 };
-    const smelting = MISSIONS.find((mission) => mission.id === 'm4_smelt')!;
-    expect(missionProgress(state, smelting)).toMatchObject({ current: 4, complete: false });
-  });
-
-  it('completes a mission once and pays the reward', () => {
-    const state = createInitialState();
-    state.stats.tilesMoved = 20;
-
-    const first = evaluateMissions(state);
-    expect(first).toHaveLength(1);
-    expect(first[0]?.mission.id).toBe('m1_move');
-    expect(state.credits).toBe(40);
-    expect(hasUnlock(state, 'sell')).toBe(true);
-
-    expect(evaluateMissions(state)).toHaveLength(0);
-    expect(state.credits).toBe(40);
-  });
-
-  it('keeps the chain in order — a later goal alone completes nothing', () => {
-    const state = createInitialState();
-    state.stats.creditsEarned = 5000;
-
-    expect(evaluateMissions(state)).toHaveLength(0);
-    expect(activeMission(state)?.id).toBe('m1_move');
-  });
-
-  it('completes several missions in one pass when all their goals are met', () => {
-    const state = createInitialState();
-    state.stats.tilesMoved = 100;
-    state.stats.oreMined = 100;
-    state.stats.creditsEarned = 500;
-
-    const completed = evaluateMissions(state).map((entry) => entry.mission.id);
-
-    expect(completed).toEqual(['m1_move', 'm2_mine', 'm3_earn']);
-    expect(activeMission(state)?.id).toBe('m4_smelt');
-  });
-});
-
 describe('shop', () => {
-  it('names the reason a card is locked', () => {
+  it('names the reason a card is blocked', () => {
     const state = createInitialState();
 
     expect(purchaseBlocker(state, 'move')).toBe('already_owned');
     expect(purchaseBlocker(state, 'scan')).toBe('already_owned');
-    expect(purchaseBlocker(state, 'sell')).toBe('too_expensive');
+    // Nothing harvested yet, so a priced node is short of resources...
+    expect(purchaseBlocker(state, 'trade')).toBe('missing_resources');
+    // ...and one behind a prerequisite reports that first.
     expect(purchaseBlocker(state, 'craft')).toBe('unlock_locked');
   });
 
-  it('refuses a purchase the player cannot afford and keeps the credits', () => {
-    const state = createInitialState();
-    state.credits = 10;
+  it('refuses a purchase the fleet cannot afford and keeps the resources', () => {
+    const state = withResources({ iron_ore: 5 });
 
-    const result = buyUnlock(state, 'sell');
+    const result = buyUnlock(state, 'trade');
 
-    expect(result).toMatchObject({ ok: false, reason: 'too_expensive' });
-    expect(state.credits).toBe(10);
-    expect(hasUnlock(state, 'sell')).toBe(false);
+    expect(result).toMatchObject({ ok: false, reason: 'missing_resources' });
+    expect(state.robots[0]?.inventory).toEqual({ iron_ore: 5 });
+    expect(hasUnlock(state, 'trade')).toBe(false);
   });
 
-  it('charges for a purchase and unlocks the command', () => {
-    const state = createInitialState();
-    state.credits = 200;
+  it('charges resources for a purchase and unlocks the command', () => {
+    const state = withResources({ iron_ore: 10 });
 
-    expect(buyUnlock(state, 'sell').ok).toBe(true);
+    expect(buyUnlock(state, 'trade').ok).toBe(true);
 
-    expect(state.credits).toBe(140);
-    expect(unlockedCommands(state)).toContain('sell');
-    expect(isPurchasable(state, 'sell')).toBe(false);
+    expect(state.robots[0]?.inventory['iron_ore'] ?? 0).toBe(0);
+    expect(unlockedCommands(state)).toContain('trade');
+    expect(isPurchasable(state, 'trade')).toBe(false);
   });
 
   it('hides the free starting commands but keeps everything with a price', () => {
     const listed = visibleUnlocks(createInitialState()).map((unlock) => unlock.id);
 
-    // move/mine/print are owned and cost nothing, so a card for them would be a
-    // row the player can never act on.
     expect(listed).not.toContain('move');
     expect(listed).not.toContain('mine');
     expect(listed).not.toContain('print');
@@ -161,36 +104,36 @@ describe('shop', () => {
   });
 
   it('keeps a paid unlock on the shelf after it is bought', () => {
-    const state = createInitialState();
-    state.credits = 500;
-    buyUnlock(state, 'sell');
+    const state = withResources(RICH);
+    buyUnlock(state, 'trade');
 
-    expect(visibleUnlocks(state).map((unlock) => unlock.id)).toContain('sell');
+    expect(visibleUnlocks(state).map((unlock) => unlock.id)).toContain('trade');
   });
 
   it('rejects an unknown upgrade', () => {
-    const state = createInitialState();
-    expect(buyUnlock(state, 'teleport' as UnlockId)).toMatchObject({
+    expect(buyUnlock(createInitialState(), 'teleport' as UnlockId)).toMatchObject({
       ok: false,
       reason: 'unknown_unlock',
     });
   });
 
-  it('respects prerequisites in both directions', () => {
-    const state = createInitialState();
-    state.credits = 10_000;
-    state.completedMissions = ['m2_mine'];
+  it('respects prerequisites: craft needs drop first', () => {
+    const state = withResources(RICH);
 
     expect(buyUnlock(state, 'craft').ok).toBe(false);
     expect(buyUnlock(state, 'drop').ok).toBe(true);
     expect(buyUnlock(state, 'craft').ok).toBe(true);
   });
+
+  it('points at the first affordable-by-dependency node as next', () => {
+    // A fresh factory owns the starters, so the cheapest reachable priced node is next.
+    expect(nextUnlock(createInitialState())?.id).toBe('trade');
+  });
 });
 
 describe('unlock effects', () => {
   it('raises the carrying capacity', () => {
-    const state = createInitialState();
-    state.credits = 10_000;
+    const state = withResources(RICH);
 
     buyUnlock(state, 'capacity_20');
     expect(state.inventoryCapacity).toBe(20);
@@ -200,8 +143,7 @@ describe('unlock effects', () => {
   });
 
   it('speeds the robot up and never slows it back down', () => {
-    const state = createInitialState();
-    state.credits = 10_000;
+    const state = withResources(RICH);
 
     buyUnlock(state, 'tick_300');
     buyUnlock(state, 'tick_200');
@@ -209,8 +151,7 @@ describe('unlock effects', () => {
   });
 
   it('grows the factory without moving anything', () => {
-    const state = createInitialState();
-    state.credits = 10_000;
+    const state = withResources(RICH);
     const market = state.grid.tiles[0];
 
     buyUnlock(state, 'grid_12');
@@ -220,10 +161,10 @@ describe('unlock effects', () => {
     expect(state.grid.tiles[0]).toBe(market);
   });
 
-  it('adds a second robot on a free tile', () => {
-    const state = createInitialState();
-    state.credits = 10_000;
-    state.completedMissions = [...MISSIONS.map((mission) => mission.id)];
+  it('adds a second robot on a free tile once the grid is grown', () => {
+    const state = withResources(RICH);
+    buyUnlock(state, 'grid_12');
+    buyUnlock(state, 'grid_16');
 
     expect(buyUnlock(state, 'robot_2').ok).toBe(true);
 

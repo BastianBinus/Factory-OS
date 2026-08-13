@@ -1,13 +1,17 @@
 import type { GameState, Inventory } from './types';
-import { RESOURCE_IDS, addItems, removeItems } from './resources';
+import { RESOURCE_IDS, addItems, isOre, removeItems } from './resources';
+import { oreCount, oreTotals, takeOre } from './batches';
 
 /**
  * The economy has no money and no bank. What the player can spend is simply
  * everything the robots are carrying, added together — so an upgrade is bought
  * with the very metal the fleet just harvested.
+ *
+ * Ore lives in batches rather than the count inventory, so it is folded back in
+ * here; everything else is a plain count.
  */
 
-/** Every robot's inventory summed into one. The fleet's spendable wealth. */
+/** Every robot's inventory and ore batches summed into one. The fleet's wealth. */
 export function totalResources(state: GameState): Inventory {
   const total: Inventory = {};
   for (const robot of state.robots) {
@@ -15,6 +19,9 @@ export function totalResources(state: GameState): Inventory {
       const amount = robot.inventory[id] ?? 0;
       if (amount > 0) addItems(total, id, amount);
     }
+    const ore = oreTotals(robot);
+    addItems(total, 'iron_ore', ore.iron_ore);
+    addItems(total, 'copper_ore', ore.copper_ore);
   }
   return total;
 }
@@ -37,19 +44,26 @@ export function canAfford(state: GameState, cost: Inventory): boolean {
 
 /**
  * Pays `cost` out of the fleet, drawing from each robot in turn until the bill
- * is met. Returns false and touches nothing if the fleet cannot cover it, so a
- * failed purchase never leaves a robot half-charged.
+ * is met. Ore comes out of batches lowest-purity-first (so a saved high-purity
+ * batch is never spent by accident); everything else out of the count inventory.
+ * Returns false and touches nothing if the fleet cannot cover it.
  */
 export function spendResources(state: GameState, cost: Inventory): boolean {
   if (!canAfford(state, cost)) return false;
   for (const id of RESOURCE_IDS) {
     let owed = cost[id] ?? 0;
+    if (owed <= 0) continue;
     for (const robot of state.robots) {
       if (owed <= 0) break;
-      const take = Math.min(robot.inventory[id] ?? 0, owed);
-      if (take > 0) {
-        removeItems(robot.inventory, id, take);
-        owed -= take;
+      if (isOre(id)) {
+        const take = Math.min(oreCount(robot, id), owed);
+        if (take > 0 && takeOre(robot, id, take)) owed -= take;
+      } else {
+        const take = Math.min(robot.inventory[id] ?? 0, owed);
+        if (take > 0) {
+          removeItems(robot.inventory, id, take);
+          owed -= take;
+        }
       }
     }
   }

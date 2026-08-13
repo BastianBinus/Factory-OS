@@ -138,7 +138,7 @@ export function gridFromLayout(layout: string[]): Grid {
 }
 
 export function createRobot(id: string, x: number, y: number): Robot {
-  return { id, x, y, facing: 'south', inventory: {} };
+  return { id, x, y, facing: 'south', inventory: {}, batches: [] };
 }
 
 /**

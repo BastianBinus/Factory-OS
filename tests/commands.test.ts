@@ -5,9 +5,11 @@ import {
   ctxOf,
   expectFail,
   expectOk,
+  giveOre,
   groundAt,
   idle,
   machineAt,
+  oreCarried,
   robotOf,
   runTick,
   stateFromLayout,
@@ -62,7 +64,9 @@ describe('mine', () => {
 
     expectOk(runTick(state, mine));
 
-    expect(robotOf(state).inventory).toEqual({ iron_ore: BASE_YIELD, seed_crystal: 1 });
+    // Ore lands in the batches; only the crystal is a plain count.
+    expect(robotOf(state).inventory).toEqual({ seed_crystal: 1 });
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(BASE_YIELD);
     expect(groundAt(state, 2, 0).state).toBe('raw');
     expect(state.stats.oreMined).toBe(BASE_YIELD);
   });
@@ -84,29 +88,34 @@ describe('mine', () => {
     expectOk(runTick(state, mine));
 
     // Two harvests of iron; the crystal from the first one paid for the seeding.
-    expect(robotOf(state).inventory).toEqual({ iron_ore: BASE_YIELD * 2, seed_crystal: 1 });
+    expect(robotOf(state).inventory).toEqual({ seed_crystal: 1 });
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(BASE_YIELD * 2);
   });
 });
 
 describe('drop', () => {
   it('loads everything the machine can use', () => {
     const state = stateFromLayout(LAYOUT, 2, 1);
-    robotOf(state).inventory = { iron_ore: 3, copper_ore: 1 };
+    giveOre(robotOf(state), 'iron_ore', 3);
+    giveOre(robotOf(state), 'copper_ore', 1);
 
     expectOk(runTick(state, drop));
 
     expect(machineAt(state, 2, 1).input).toEqual({ iron_ore: 3, copper_ore: 1 });
     expect(robotOf(state).inventory).toEqual({});
+    expect(robotOf(state).batches).toEqual([]);
   });
 
   it('keeps what the machine cannot use', () => {
     const state = stateFromLayout(LAYOUT, 2, 2);
-    robotOf(state).inventory = { iron_ingot: 2, iron_ore: 4 };
+    robotOf(state).inventory = { iron_ingot: 2 };
+    giveOre(robotOf(state), 'iron_ore', 4);
 
     expectOk(runTick(state, drop));
 
     expect(machineAt(state, 2, 2).input).toEqual({ iron_ingot: 2 });
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 4 });
+    expect(robotOf(state).inventory).toEqual({});
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(4);
   });
 
   it('explains when nothing fits', () => {
@@ -200,18 +209,19 @@ describe('craft and take', () => {
 describe('trade', () => {
   it('swaps three of one ore for one of another on the market', () => {
     const state = stateFromLayout(LAYOUT, 0, 0);
-    robotOf(state).inventory = { iron_ore: 7 };
+    giveOre(robotOf(state), 'iron_ore', 7);
 
     const result = expectOk(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore')));
 
     // Seven ore trade in whole threes: two copper out, six iron gone, one left.
     expect(result.value).toBe(2);
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 1, copper_ore: 2 });
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(1);
+    expect(oreCarried(robotOf(state), 'copper_ore')).toBe(2);
   });
 
   it('only works on the market', () => {
     const state = stateFromLayout(LAYOUT, 1, 1);
-    robotOf(state).inventory = { iron_ore: 3 };
+    giveOre(robotOf(state), 'iron_ore', 3);
     expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore'))).code).toBe(
       'nothing_here',
     );
@@ -219,7 +229,7 @@ describe('trade', () => {
 
   it('needs at least three of the input', () => {
     const state = stateFromLayout(LAYOUT, 0, 0);
-    robotOf(state).inventory = { iron_ore: 2 };
+    giveOre(robotOf(state), 'iron_ore', 2);
     expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore'))).code).toBe(
       'missing_input',
     );

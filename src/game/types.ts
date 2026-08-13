@@ -14,10 +14,27 @@ export type ResourceId =
   | 'gear'
   | 'seed_crystal';
 
+/** The raw ores. These are the only resources carried as purity-bearing batches. */
+export type OreId = 'iron_ore' | 'copper_ore';
+
 export type MachineId = 'smelter' | 'assembler' | 'seeder';
 
 /** Sparse on purpose: a missing key means zero. Use the helpers in resources.ts. */
 export type Inventory = Partial<Record<ResourceId, number>>;
+
+/**
+ * A parcel of ore stamped with the purity of the tile it was mined from.
+ *
+ * Ore is the one thing carried as batches rather than a bare count, because the
+ * refinery and the press judge it by purity — a count would throw that away the
+ * moment the ore left the ground.
+ */
+export interface Batch {
+  resource: OreId;
+  amount: number;
+  /** 1..10, inherited from the ground tile at mine time. */
+  purity: number;
+}
 
 export type GroundState = 'raw' | 'prepared' | 'growing' | 'ripe';
 
@@ -66,7 +83,10 @@ export interface Robot {
   x: number;
   y: number;
   facing: Direction;
+  /** Everything but raw ore: ingots, gears, crystals. Ore lives in `batches`. */
   inventory: Inventory;
+  /** Raw ore the robot carries, each parcel keeping the purity it was mined at. */
+  batches: Batch[];
 }
 
 export interface Grid {

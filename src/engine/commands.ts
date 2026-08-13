@@ -6,6 +6,7 @@ import type {
   GroundTile,
   Inventory,
   MachineTile,
+  OreId,
   Robot,
   Tile,
 } from '../game/types';
@@ -17,11 +18,13 @@ import {
   cloneInventory,
   describeInventory,
   isEmpty,
+  isOre,
   isResourceId,
   removeItems,
   totalItems,
 } from '../game/resources';
 import { findRunnableRecipe, getRecipe, recipesFor } from '../game/recipes';
+import { BASE_PURITY, addBatch, hasNoOre, oreCount, takeOre, totalOre } from '../game/batches';
 import { count } from '../game/rates';
 import { GROW_TICKS, isSeedable, purityFor, ripen, yieldFor } from '../game/cultivation';
 
@@ -52,7 +55,7 @@ function currentTile(ctx: CommandContext): Tile | undefined {
 }
 
 function freeCapacity(ctx: CommandContext): number {
-  return ctx.state.inventoryCapacity - totalItems(ctx.robot.inventory);
+  return ctx.state.inventoryCapacity - totalItems(ctx.robot.inventory) - totalOre(ctx.robot);
 }
 
 // Commands ------------------------------------------------------------------
@@ -170,18 +173,21 @@ function harvest(ctx: CommandContext, tile: GroundTile): CommandResult {
   }
 
   const resource = tile.resource;
-  addItems(ctx.robot.inventory, resource, haul);
+  // Ore leaves the ground as a batch stamped with the tile's purity; the crystal
+  // is a plain count. The purity is what the refinery and press will judge later.
+  addBatch(ctx.robot, resource as OreId, haul, tile.purity);
   addItems(ctx.robot.inventory, 'seed_crystal', 1);
   ctx.state.stats.oreMined += haul;
   count(ctx.state, 'mine', haul);
 
+  const purity = tile.purity;
   tile.state = 'raw';
   tile.resource = null;
   tile.ripeAt = null;
   tile.yield = 0;
   tile.purity = 0;
 
-  return ok(resource, `harvested ${haul} ${resource} and 1 seed crystal`);
+  return ok(resource, `harvested ${haul} ${resource} (purity ${purity}) and 1 seed crystal`);
 }
 
 export function drop(ctx: CommandContext): CommandResult {
@@ -190,26 +196,33 @@ export function drop(ctx: CommandContext): CommandResult {
   if (!tile || tile.kind !== 'machine') {
     return fail('nothing_here', 'There is no machine on this tile to drop into.');
   }
-  if (isEmpty(ctx.robot.inventory)) {
+  if (isEmpty(ctx.robot.inventory) && hasNoOre(ctx.robot)) {
     return fail('inventory_empty', 'The robot is not carrying anything.');
   }
 
   const accepted = acceptedInputs(tile);
   const moved: Inventory = {};
-  let count = 0;
+  let dropped = 0;
 
   for (const id of RESOURCE_IDS) {
     if (!accepted.has(id)) continue;
-    const amount = ctx.robot.inventory[id] ?? 0;
+
+    // Ore comes out of the batches (its purity is dropped here — a smelter does
+    // not care; the refinery and press take it a different way). Everything else
+    // is a plain count.
+    const amount = isOre(id) ? oreCount(ctx.robot, id) : ctx.robot.inventory[id] ?? 0;
     if (amount <= 0) continue;
-    removeItems(ctx.robot.inventory, id, amount);
+
+    if (isOre(id)) takeOre(ctx.robot, id, amount);
+    else removeItems(ctx.robot.inventory, id, amount);
     addItems(tile.input, id, amount);
     addItems(moved, id, amount);
-    count += amount;
+    dropped += amount;
   }
 
-  if (count === 0) {
-    return fail('bad_argument', `The ${tile.machine} does not take ${describeInventory(ctx.robot.inventory)}.`);
+  if (dropped === 0) {
+    const carried = describeInventory(ctx.robot.inventory);
+    return fail('bad_argument', `The ${tile.machine} does not take ${carried}.`);
   }
 
   return ok(moved, `dropped ${describeInventory(moved)} into the ${tile.machine}`);
@@ -286,17 +299,19 @@ export function trade(ctx: CommandContext, from: unknown, to: unknown): CommandR
   if (!tile || tile.kind !== 'market') {
     return fail('nothing_here', 'The robot has to stand on the market tile to trade.');
   }
-  if (!isResourceId(from) || !isResourceId(to)) {
+  // Trading is an ore-for-ore market: it exists so a resource you cannot reach is
+  // never a hard dead end, and ore is the only thing carried in batches anyway.
+  if (!isOre(from) || !isOre(to)) {
     return fail(
       'bad_argument',
-      `trade() needs two resource names — got (${JSON.stringify(from)}, ${JSON.stringify(to)}).`,
+      `trade() swaps one ore for another — got (${JSON.stringify(from)}, ${JSON.stringify(to)}).`,
     );
   }
   if (from === to) {
-    return fail('bad_argument', 'trade() needs two different resources.');
+    return fail('bad_argument', 'trade() needs two different ores.');
   }
 
-  const held = ctx.robot.inventory[from] ?? 0;
+  const held = oreCount(ctx.robot, from);
   if (held < TRADE_RATIO) {
     return fail(
       'missing_input',
@@ -305,9 +320,10 @@ export function trade(ctx: CommandContext, from: unknown, to: unknown): CommandR
   }
 
   // Three in for one out only ever shrinks the load, so capacity never bites.
+  // Traded ore has no tile behind it, so it comes out at the neutral purity.
   const out = Math.floor(held / TRADE_RATIO);
-  removeItems(ctx.robot.inventory, from, out * TRADE_RATIO);
-  addItems(ctx.robot.inventory, to, out);
+  takeOre(ctx.robot, from, out * TRADE_RATIO);
+  addBatch(ctx.robot, to, out, BASE_PURITY);
 
   return ok(
     out,

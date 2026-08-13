@@ -193,6 +193,15 @@ export const UNLOCKS: UnlockDef[] = [
     commands: ['worldSize'],
     conceptId: 'recursion',
   },
+  {
+    id: 'belts',
+    label: 'Conveyor belts',
+    description:
+      'belt(direction) lays a belt on raw ground. Belts carry a machine’s output along and into the next machine, tick by tick, with no robot.',
+    cost: { alloy: 25, component: 20 },
+    requiresUnlocks: ['routing'],
+    commands: ['belt'],
+  },
 ];
 
 export function getUnlock(id: UnlockId): UnlockDef | undefined {

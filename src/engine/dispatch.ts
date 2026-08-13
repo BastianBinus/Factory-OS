@@ -1,6 +1,7 @@
 import type { CommandResult } from '../game/types';
 import type { CommandContext } from './commands';
 import {
+  belt,
   clear,
   craft,
   drop,
@@ -41,6 +42,7 @@ const RUNNERS: Record<string, CommandRunner> = {
   swapSlots: (ctx, args) => swapSlots(ctx, args[0], args[1]),
   press: (ctx) => press(ctx),
   pour: (ctx) => pour(ctx),
+  belt: (ctx, args) => belt(ctx, args[0]),
   trade: (ctx, args) => trade(ctx, args[0], args[1]),
   wait: () => wait(),
   scan: (ctx) => scan(ctx),

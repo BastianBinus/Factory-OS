@@ -506,6 +506,24 @@ export function createMarket(geometry: WorldGeometry, materials: WorldMaterials)
   return group;
 }
 
+export function createBelt(
+  geometry: WorldGeometry,
+  materials: WorldMaterials,
+  direction: 'north' | 'east' | 'south' | 'west',
+): Group {
+  const group = new Group();
+  const deck = solid(geometry.machineBase, materials.metalDark);
+  deck.scale.set(1, 0.3, 1);
+  // A thin accent bar pointing the way the belt runs.
+  const arrow = solid(geometry.smelterPort, materials.accent);
+  arrow.position.y = 0.12;
+  arrow.scale.set(0.5, 0.3, 1.4);
+  const turn: Record<string, number> = { north: 0, south: Math.PI, east: -Math.PI / 2, west: Math.PI / 2 };
+  arrow.rotation.y = turn[direction] ?? 0;
+  group.add(deck, arrow);
+  return group;
+}
+
 export function createWall(geometry: WorldGeometry, materials: WorldMaterials): Group {
   const group = new Group();
   // A plain solid block, dark, that fills its tile. Placeholder art; the point is

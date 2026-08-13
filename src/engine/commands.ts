@@ -8,11 +8,12 @@ import type {
   Inventory,
   MachineTile,
   OreId,
+  ResourceId,
   Robot,
   Tile,
 } from '../game/types';
 import { PRESS_SLOTS } from '../game/types';
-import { inBounds, isDirection, step, tileAt } from '../game/grid';
+import { inBounds, isDirection, setTile, step, tileAt } from '../game/grid';
 import {
   RESOURCES,
   RESOURCE_IDS,
@@ -483,6 +484,18 @@ export function pour(ctx: CommandContext): CommandResult {
   return ok(cast, `poured ${cast} alloy from ${cast} hot smelters`);
 }
 
+export function belt(ctx: CommandContext, direction: unknown): CommandResult {
+  if (!isDirection(direction)) {
+    return fail('bad_argument', `belt() needs a direction — got ${JSON.stringify(direction)}.`);
+  }
+  const tile = currentTile(ctx);
+  if (!tile || tile.kind !== 'ground' || tile.state !== 'raw') {
+    return fail('nothing_here', 'A belt can only be laid on open, raw ground.');
+  }
+  setTile(ctx.state.grid, ctx.robot.x, ctx.robot.y, { kind: 'belt', direction, item: null });
+  return ok(direction, `laid a belt running ${direction}`);
+}
+
 /** How many of `from` buy one of `to` at the market. */
 export const TRADE_RATIO = 3;
 
@@ -597,6 +610,8 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
       return { type: 'market', x, y };
     case 'wall':
       return { type: 'wall', x, y };
+    case 'belt':
+      return { type: 'belt', x, y, direction: tile.direction, item: tile.item };
     default:
       return { type: 'unknown', x, y };
   }
@@ -621,5 +636,78 @@ export function advanceWorld(state: GameState): void {
     tile.job = null;
   }
 
+  advanceBelts(state);
   ripen(state);
+}
+
+const OPPOSITE: Record<Direction, Direction> = {
+  north: 'south',
+  east: 'west',
+  south: 'north',
+  west: 'east',
+};
+
+/**
+ * Moves every belt's item one step and pulls fresh output onto empty belts — the
+ * one part of the world that carries material without a robot.
+ *
+ * Two passes over a fixed row-major order keep it deterministic. First items
+ * advance, but a tile that just received one is marked so the same item cannot
+ * leapfrog further this tick; a belt hands its item to the next empty belt, or
+ * into a machine that accepts it, or holds it if neither. Then every empty belt
+ * pulls one item off a machine sitting directly behind it.
+ */
+function advanceBelts(state: GameState): void {
+  const grid = state.grid;
+  const filledThisTick = new Set<number>();
+
+  for (let y = 0; y < grid.height; y += 1) {
+    for (let x = 0; x < grid.width; x += 1) {
+      const tile = tileAt(grid, x, y);
+      if (tile?.kind !== 'belt' || tile.item === null) continue;
+      const here = indexOfXY(grid, x, y);
+      if (filledThisTick.has(here)) continue;
+
+      const ahead = step(x, y, tile.direction);
+      const target = tileAt(grid, ahead.x, ahead.y);
+
+      if (target?.kind === 'belt' && target.item === null) {
+        target.item = tile.item;
+        tile.item = null;
+        filledThisTick.add(indexOfXY(grid, ahead.x, ahead.y));
+      } else if (target?.kind === 'machine' && machineAccepts(target, tile.item)) {
+        addItems(target.input, tile.item, 1);
+        tile.item = null;
+      }
+      // else: the way is blocked, the item waits.
+    }
+  }
+
+  // Loading: an empty belt pulls one item off a machine directly behind it.
+  for (let y = 0; y < grid.height; y += 1) {
+    for (let x = 0; x < grid.width; x += 1) {
+      const tile = tileAt(grid, x, y);
+      if (tile?.kind !== 'belt' || tile.item !== null) continue;
+      const behind = step(x, y, OPPOSITE[tile.direction]);
+      const source = tileAt(grid, behind.x, behind.y);
+      if (source?.kind !== 'machine') continue;
+      for (const id of RESOURCE_IDS) {
+        if ((source.output[id] ?? 0) > 0) {
+          removeItems(source.output, id, 1);
+          tile.item = id;
+          break;
+        }
+      }
+    }
+  }
+}
+
+/** Grid index for (x, y). Local to the belt sim so it needs no extra import. */
+function indexOfXY(grid: GameState['grid'], x: number, y: number): number {
+  return y * grid.width + x;
+}
+
+/** True when the machine has a recipe that consumes `id` — what drop/belts feed. */
+function machineAccepts(tile: MachineTile, id: ResourceId): boolean {
+  return acceptedInputs(tile).has(id);
 }

@@ -91,7 +91,17 @@ export interface WallTile {
   kind: 'wall';
 }
 
-export type Tile = GroundTile | MachineTile | MarketTile | WallTile;
+/**
+ * A conveyor belt. Each tick the world moves its item one step along `direction`,
+ * onto the next empty belt or into a machine that accepts it — no robot needed.
+ */
+export interface BeltTile {
+  kind: 'belt';
+  direction: Direction;
+  item: ResourceId | null;
+}
+
+export type Tile = GroundTile | MachineTile | MarketTile | WallTile | BeltTile;
 
 export interface Robot {
   id: string;
@@ -149,7 +159,8 @@ export type UnlockId =
   | 'calibration'
   | 'sorting'
   | 'foundry'
-  | 'routing';
+  | 'routing'
+  | 'belts';
 
 export type ConceptId =
   | 'await'

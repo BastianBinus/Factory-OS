@@ -104,13 +104,19 @@ const queue = new ActionQueue();
 function snapshotOf(robotId: string): StateSnapshot {
   const index = state.robots.findIndex((entry) => entry.id === robotId);
   const robot = index === -1 ? undefined : state.robots[index];
+  // Ore lives in batches, but inventory() should still report it, so the totals
+  // are folded back into the plain counts the reader hands the player.
+  const inventory: Record<string, number> = { ...(robot?.inventory ?? {}) };
+  for (const batch of robot?.batches ?? []) {
+    inventory[batch.resource] = (inventory[batch.resource] ?? 0) + batch.amount;
+  }
   return {
     robotId,
     index: Math.max(index, 0),
     x: robot?.x ?? 0,
     y: robot?.y ?? 0,
     facing: robot?.facing ?? 'south',
-    inventory: { ...(robot?.inventory ?? {}) },
+    inventory,
     tick: state.tick,
   };
 }

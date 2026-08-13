@@ -225,9 +225,9 @@ describe('the cultivation and currency migrations', () => {
     expect(grid.tiles).toHaveLength(144);
     expect(grid.tiles.map((tile) => tile.kind)).not.toContain('ore');
 
-    // The floor has to come back whole: three machines, a market, and something
+    // The floor has to come back whole: the machines, a market, and something
     // ripe to harvest. A grid of bare raw ground would be a save nobody can play.
-    expect(grid.tiles.filter((tile) => tile.kind === 'machine')).toHaveLength(3);
+    expect(grid.tiles.filter((tile) => tile.kind === 'machine')).toHaveLength(4);
     expect(grid.tiles.filter((tile) => tile.kind === 'market')).toHaveLength(1);
     expect(
       grid.tiles.filter((tile) => tile.kind === 'ground' && tile.state === 'ripe'),

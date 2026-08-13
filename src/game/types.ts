@@ -12,12 +12,13 @@ export type ResourceId =
   | 'iron_ingot'
   | 'copper_ingot'
   | 'gear'
-  | 'seed_crystal';
+  | 'seed_crystal'
+  | 'refined_ingot';
 
 /** The raw ores. These are the only resources carried as purity-bearing batches. */
 export type OreId = 'iron_ore' | 'copper_ore';
 
-export type MachineId = 'smelter' | 'assembler' | 'seeder';
+export type MachineId = 'smelter' | 'assembler' | 'seeder' | 'refinery';
 
 /** Sparse on purpose: a missing key means zero. Use the helpers in resources.ts. */
 export type Inventory = Partial<Record<ResourceId, number>>;
@@ -130,7 +131,8 @@ export type UnlockId =
   | 'tick_300'
   | 'tick_200'
   | 'tick_120'
-  | 'robot_2';
+  | 'robot_2'
+  | 'calibration';
 
 export type ConceptId =
   | 'await'

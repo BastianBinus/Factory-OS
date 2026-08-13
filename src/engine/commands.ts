@@ -24,7 +24,16 @@ import {
   totalItems,
 } from '../game/resources';
 import { findRunnableRecipe, getRecipe, recipesFor } from '../game/recipes';
-import { BASE_PURITY, addBatch, hasNoOre, oreCount, takeOre, totalOre } from '../game/batches';
+import {
+  BASE_PURITY,
+  addBatch,
+  hasNoOre,
+  maxPurityOnFloor,
+  oreCount,
+  takeBestBatch,
+  takeOre,
+  totalOre,
+} from '../game/batches';
 import { count } from '../game/rates';
 import { GROW_TICKS, isSeedable, purityFor, ripen, yieldFor } from '../game/cultivation';
 
@@ -288,6 +297,41 @@ export function take(ctx: CommandContext): CommandResult {
   }
 
   return ok(taken, `took ${describeInventory(taken)}`);
+}
+
+/**
+ * The calibration bay. Feeds the robot's best ore batch into the refinery, which
+ * accepts it only if its purity is the highest anywhere — nothing riper is still
+ * on the floor. Feed a lesser batch and the refinery rejects it, and the batch is
+ * destroyed. So the player has to scan the whole field, find the maximum, and
+ * mine that tile before refining: the mechanic is a max over the grid.
+ */
+export function refine(ctx: CommandContext): CommandResult {
+  const tile = currentTile(ctx);
+
+  if (!tile || tile.kind !== 'machine' || tile.machine !== 'refinery') {
+    return fail('nothing_here', 'The robot has to stand on the refinery to refine.');
+  }
+
+  const batch = takeBestBatch(ctx.robot);
+  if (batch === null) {
+    return fail('inventory_empty', 'The robot is carrying no ore to refine.');
+  }
+
+  const floorBest = maxPurityOnFloor(ctx.state) ?? 0;
+  if (batch.purity < floorBest) {
+    // Rejected, and gone: feeding the refinery anything but the best destroys it.
+    return fail(
+      'blocked',
+      `The refinery rejected a purity-${batch.purity} batch and destroyed it — a purity-${floorBest} crop is still on the floor. Refine the ripest.`,
+    );
+  }
+
+  addItems(ctx.robot.inventory, 'refined_ingot', batch.amount);
+  return ok(
+    batch.amount,
+    `refined ${batch.amount} ore of purity ${batch.purity} into refined ingot`,
+  );
 }
 
 /** How many of `from` buy one of `to` at the market. */

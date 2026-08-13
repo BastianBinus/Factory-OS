@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { clear, craft, drop, mine, move, scan, scanAt, seed, take, trade } from '../src/engine/commands';
+import type { GroundTile } from '../src/game/types';
+import { clear, craft, drop, mine, move, refine, scan, scanAt, seed, take, trade } from '../src/engine/commands';
+import { setTile } from '../src/game/grid';
 import { BASE_YIELD, purityFor } from '../src/game/cultivation';
 import {
   ctxOf,
@@ -237,10 +239,50 @@ describe('trade', () => {
 
   it('refuses to trade a resource for itself', () => {
     const state = stateFromLayout(LAYOUT, 0, 0);
-    robotOf(state).inventory = { iron_ore: 9 };
+    giveOre(robotOf(state), 'iron_ore', 9);
     expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'iron_ore'))).code).toBe(
       'bad_argument',
     );
+  });
+});
+
+describe('refine', () => {
+  function ripeIron(purity: number): GroundTile {
+    return { kind: 'ground', state: 'ripe', resource: 'iron_ore', ripeAt: null, yield: 3, purity };
+  }
+
+  it('accepts the purest batch and yields a refined ingot', () => {
+    // Robot stands on the refinery; nothing riper is on this bare floor.
+    const state = stateFromLayout(['R.', '..'], 0, 0);
+    giveOre(robotOf(state), 'iron_ore', 3, 9);
+
+    const result = expectOk(runTick(state, refine));
+
+    expect(result.value).toBe(3);
+    expect(robotOf(state).inventory).toEqual({ refined_ingot: 3 });
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(0);
+  });
+
+  it('rejects and destroys a batch when a purer crop is still on the floor', () => {
+    const state = stateFromLayout(['R.', '..'], 0, 0);
+    setTile(state.grid, 1, 0, ripeIron(8)); // a better crop the robot ignored
+    giveOre(robotOf(state), 'iron_ore', 3, 4);
+
+    expect(expectFail(runTick(state, refine)).code).toBe('blocked');
+    // The fed batch is gone; nothing was refined.
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(0);
+    expect(robotOf(state).inventory['refined_ingot'] ?? 0).toBe(0);
+  });
+
+  it('needs ore to refine', () => {
+    const state = stateFromLayout(['R.', '..'], 0, 0);
+    expect(expectFail(runTick(state, refine)).code).toBe('inventory_empty');
+  });
+
+  it('only works on the refinery', () => {
+    const state = stateFromLayout(['..'], 0, 0);
+    giveOre(robotOf(state), 'iron_ore', 3, 5);
+    expect(expectFail(runTick(state, refine)).code).toBe('nothing_here');
   });
 });
 

@@ -127,6 +127,7 @@ export class WorldMaterials {
       }),
       gear: new MeshStandardMaterial({ color: colorFor(palette, 'gear'), ...METAL }),
       seed_crystal: new MeshStandardMaterial({ color: colorFor(palette, 'seed_crystal'), ...METAL }),
+      refined_ingot: new MeshStandardMaterial({ color: colorFor(palette, 'refined_ingot'), ...METAL }),
     };
   }
 
@@ -268,6 +269,8 @@ export function createMachine(
       return createAssembler(geometry, materials);
     case 'seeder':
       return createSeeder(geometry, materials);
+    case 'refinery':
+      return createRefinery(geometry, materials);
   }
 }
 
@@ -378,6 +381,36 @@ function createSeeder(geometry: WorldGeometry, materials: WorldMaterials): Machi
     animate(delta) {
       // Slower than the assembler: this one is grinding, not cutting.
       if (busy) stirrer.rotation.y += delta * 2.5;
+    },
+  };
+}
+
+function createRefinery(geometry: WorldGeometry, materials: WorldMaterials): MachineView {
+  const group = new Group();
+
+  const base = solid(geometry.machineBase, materials.metalDark);
+  const body = solid(geometry.smelterBody, materials.metal);
+  body.position.y = 0.34;
+
+  // A calibration dial on top, spinning while it grades a batch.
+  const dial = solid(geometry.assemblerGear, materials.accent);
+  dial.position.y = 0.78;
+  dial.rotation.x = Math.PI / 2;
+
+  const port = solid(geometry.smelterPort, materials.heat.clone());
+  port.position.set(0, 0.5, 0.29);
+
+  group.add(base, body, dial, port);
+
+  let busy = false;
+  return {
+    group,
+    setBusy(next) {
+      busy = next;
+    },
+    animate(delta) {
+      // The dial always drifts; it spins up while a batch is being judged.
+      dial.rotation.z += delta * (busy ? 4 : 0.6);
     },
   };
 }

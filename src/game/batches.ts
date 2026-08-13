@@ -66,6 +66,22 @@ export function takeOre(robot: Robot, resource: OreId, amount: number): boolean 
   return true;
 }
 
+/**
+ * Removes and returns the robot's highest-purity parcel, or null if it carries
+ * no ore. Ties break toward the larger parcel. This is what the refinery reaches
+ * for: a player feeds their best, and the machine judges whether it is best enough.
+ */
+export function takeBestBatch(robot: Robot): Batch | null {
+  if (robot.batches.length === 0) return null;
+  let bestIndex = 0;
+  for (let i = 1; i < robot.batches.length; i += 1) {
+    const a = robot.batches[i]!;
+    const b = robot.batches[bestIndex]!;
+    if (a.purity > b.purity || (a.purity === b.purity && a.amount > b.amount)) bestIndex = i;
+  }
+  return robot.batches.splice(bestIndex, 1)[0] ?? null;
+}
+
 /** The highest purity ripe on the floor right now, or null when nothing is ripe. */
 export function maxPurityOnFloor(state: GameState): number | null {
   let max: number | null = null;

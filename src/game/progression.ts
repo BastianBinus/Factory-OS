@@ -153,6 +153,16 @@ export const UNLOCKS: UnlockDef[] = [
     commands: ['me'],
     conceptId: 'objects',
   },
+  {
+    id: 'calibration',
+    label: 'Calibration bay',
+    description:
+      'The refinery accepts only the purest ore on the floor and destroys the rest. refine() feeds it your best batch.',
+    cost: { iron_ingot: 30, gear: 12 },
+    requiresUnlocks: ['craft'],
+    commands: ['refine'],
+    // No new concept: finding the maximum is arrays, already taught on grid_12.
+  },
 ];
 
 export function getUnlock(id: UnlockId): UnlockDef | undefined {

@@ -79,7 +79,7 @@ export const INITIAL_LAYOUT = [
   '.I......',
   '........',
   '...SA...',
-  '..D.....',
+  '..D.R...',
   '........',
   '.I....C.',
   '........',
@@ -95,6 +95,8 @@ function tileFromChar(char: string, x: number, y: number): Tile {
       return { kind: 'machine', machine: 'assembler', input: {}, output: {}, job: null };
     case 'D':
       return { kind: 'machine', machine: 'seeder', input: {}, output: {}, job: null };
+    case 'R':
+      return { kind: 'machine', machine: 'refinery', input: {}, output: {}, job: null };
     case 'I':
       return ripeGround('iron_ore', x, y);
     case 'C':

@@ -40,6 +40,10 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
   drop: { detail: 'await drop()', info: 'Load what the robot carries into the machine below it.' },
   craft: { detail: 'await craft()', info: 'Start the machine below the robot.' },
   take: { detail: 'await take()', info: 'Collect what the machine below the robot produced.' },
+  refine: {
+    detail: 'await refine()',
+    info: 'Feed the refinery your purest ore. It destroys anything less than the best on the floor.',
+  },
   trade: {
     detail: "await trade('iron_ore', 'copper_ore')",
     info: 'Swap three of one ore for one of another. Market tile only.',

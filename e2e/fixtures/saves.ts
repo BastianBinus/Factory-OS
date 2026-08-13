@@ -71,7 +71,7 @@ function rawGround(): Record<string, unknown> {
  */
 export function currentSave(script: string, size = 8): Record<string, unknown> {
   return {
-    version: 3,
+    version: 4,
     tick: 0,
     grid: {
       width: size,
@@ -80,6 +80,8 @@ export function currentSave(script: string, size = 8): Record<string, unknown> {
     },
     robots: [{ id: 'r1', x: 4, y: 4, facing: 'south', inventory: { seed_crystal: 2 } }],
     unlocks: ['move', 'mine', 'print', 'scan', 'cultivate'],
+    history: [],
+    tickProduced: {},
     seenConcepts: [],
     onboardingStep: ONBOARDING_DONE,
     stats: { tilesMoved: 0, oreMined: 0, crafted: {} },

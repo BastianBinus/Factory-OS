@@ -1,4 +1,5 @@
 import type {
+  Batch,
   CommandErrorCode,
   CommandResult,
   Direction,
@@ -10,6 +11,7 @@ import type {
   Robot,
   Tile,
 } from '../game/types';
+import { PRESS_SLOTS } from '../game/types';
 import { inBounds, isDirection, step, tileAt } from '../game/grid';
 import {
   RESOURCES,
@@ -334,6 +336,98 @@ export function refine(ctx: CommandContext): CommandResult {
   );
 }
 
+/** A valid press slot index: a whole number in range. */
+function isSlotIndex(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < PRESS_SLOTS;
+}
+
+/** The press tile the robot stands on, or null with a reason if it is not there. */
+function pressAt(ctx: CommandContext): MachineTile | null {
+  const tile = currentTile(ctx);
+  if (!tile || tile.kind !== 'machine' || tile.machine !== 'press' || !tile.slots) return null;
+  return tile;
+}
+
+/**
+ * Loads the robot's next ore batch into the press's first empty slot.
+ *
+ * Batches land in the order they come off the robot, which is not sorted — that
+ * is the point. The player fills the slots, then reorders them with swapSlots
+ * until they climb by purity, and only then will press() fire.
+ */
+export function load(ctx: CommandContext): CommandResult {
+  const tile = pressAt(ctx);
+  if (!tile || !tile.slots) {
+    return fail('nothing_here', 'The robot has to stand on the press to load it.');
+  }
+
+  const batch = ctx.robot.batches.shift();
+  if (!batch) {
+    return fail('inventory_empty', 'The robot is carrying no ore to load.');
+  }
+
+  const slot = tile.slots.findIndex((entry) => entry === null);
+  if (slot === -1) {
+    ctx.robot.batches.unshift(batch); // put it back; the press is full
+    return fail('inventory_full', `All ${PRESS_SLOTS} press slots are full.`);
+  }
+
+  tile.slots[slot] = batch;
+  return ok(slot, `loaded purity ${batch.purity} into slot ${slot}`);
+}
+
+export function swapSlots(ctx: CommandContext, i: unknown, j: unknown): CommandResult {
+  const tile = pressAt(ctx);
+  if (!tile || !tile.slots) {
+    return fail('nothing_here', 'The robot has to stand on the press to reorder it.');
+  }
+  if (!isSlotIndex(i) || !isSlotIndex(j)) {
+    return fail(
+      'bad_argument',
+      `swapSlots() needs two slot numbers 0..${PRESS_SLOTS - 1} — got (${JSON.stringify(i)}, ${JSON.stringify(j)}).`,
+    );
+  }
+
+  const temp = tile.slots[i]!;
+  tile.slots[i] = tile.slots[j]!;
+  tile.slots[j] = temp;
+  return ok(null, `swapped slots ${i} and ${j}`);
+}
+
+/**
+ * Fires the press, but only when the loaded slots climb by purity from left to
+ * right. Feed it an unsorted line and it refuses — so the player has to have
+ * sorted the slots first, which is the whole tier: a sorting algorithm, made
+ * mandatory. On success every slot is pressed into one component apiece.
+ */
+export function press(ctx: CommandContext): CommandResult {
+  const tile = pressAt(ctx);
+  if (!tile || !tile.slots) {
+    return fail('nothing_here', 'The robot has to stand on the press to fire it.');
+  }
+
+  const loaded = tile.slots.filter((entry): entry is Batch => entry !== null);
+  if (loaded.length < 2) {
+    return fail('missing_input', 'The press needs at least two loaded slots to fire.');
+  }
+
+  for (let k = 1; k < loaded.length; k += 1) {
+    if (loaded[k]!.purity < loaded[k - 1]!.purity) {
+      return fail(
+        'blocked',
+        'The press is loaded out of order. Its slots have to climb by purity before it will fire.',
+      );
+    }
+  }
+
+  const made = loaded.length;
+  addItems(ctx.robot.inventory, 'component', made);
+  count(ctx.state, 'press', made);
+  tile.slots = tile.slots.map(() => null);
+
+  return ok(made, `pressed ${made} sorted slots into ${made} components`);
+}
+
 /** How many of `from` buy one of `to` at the market. */
 export const TRADE_RATIO = 3;
 
@@ -436,6 +530,11 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
         output: cloneInventory(tile.output),
         busy: tile.job !== null,
         readyIn: tile.job ? Math.max(0, tile.job.readyAt - state.tick) : 0,
+        // The press exposes its slots as purities (null for empty) so a script
+        // can read them, compare, and sort with swapSlots.
+        ...(tile.slots
+          ? { slots: tile.slots.map((slot) => (slot === null ? null : slot.purity)) }
+          : {}),
       };
     case 'market':
       return { type: 'market', x, y };

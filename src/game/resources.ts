@@ -8,6 +8,7 @@ export const RESOURCES: Record<ResourceId, ResourceDef> = {
   gear: { id: 'gear', label: 'Gear', colorToken: 'w-gear' },
   seed_crystal: { id: 'seed_crystal', label: 'Seed crystal', colorToken: 'w-seed-crystal' },
   refined_ingot: { id: 'refined_ingot', label: 'Refined ingot', colorToken: 'w-metal' },
+  component: { id: 'component', label: 'Component', colorToken: 'w-gear' },
 };
 
 export const RESOURCE_IDS = Object.keys(RESOURCES) as ResourceId[];

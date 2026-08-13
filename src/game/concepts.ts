@@ -117,6 +117,25 @@ for (const direction of route) {
 }`,
   },
   {
+    id: 'sorting',
+    title: 'Sorting — putting a list in order',
+    body:
+      'Sorting rearranges a list so its items climb (or fall) by some key — here, purity. ' +
+      'The simplest way is a bubble sort: walk the list comparing each pair of neighbours, swap the ones out of order, and repeat the whole pass until a pass makes no swaps. ' +
+      'It is not the fastest sort, but it is the one you can write from memory, and the press does not care how you got there — only that the slots climb.',
+    codeExample: `// Bubble sort the 8 press slots by purity.
+for (let pass = 0; pass < 8; pass++) {
+  for (let i = 0; i < 7; i++) {
+    const here = (await scan()).slots[i];
+    const next = (await scan()).slots[i + 1];
+    if (next !== null && (here === null || here > next)) {
+      await swapSlots(i, i + 1);
+    }
+  }
+}
+await press();`,
+  },
+  {
     id: 'promises',
     title: 'Promises — the thing await was waiting for',
     body:

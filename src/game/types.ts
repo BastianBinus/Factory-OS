@@ -13,12 +13,16 @@ export type ResourceId =
   | 'copper_ingot'
   | 'gear'
   | 'seed_crystal'
-  | 'refined_ingot';
+  | 'refined_ingot'
+  | 'component';
 
 /** The raw ores. These are the only resources carried as purity-bearing batches. */
 export type OreId = 'iron_ore' | 'copper_ore';
 
-export type MachineId = 'smelter' | 'assembler' | 'seeder' | 'refinery';
+export type MachineId = 'smelter' | 'assembler' | 'seeder' | 'refinery' | 'press';
+
+/** How many slots the sorting press has. */
+export const PRESS_SLOTS = 8;
 
 /** Sparse on purpose: a missing key means zero. Use the helpers in resources.ts. */
 export type Inventory = Partial<Record<ResourceId, number>>;
@@ -71,6 +75,8 @@ export interface MachineTile {
   input: Inventory;
   output: Inventory;
   job: MachineJob | null;
+  /** The press's ordered slots. `null` on every other machine. */
+  slots?: (Batch | null)[];
 }
 
 export interface MarketTile {
@@ -132,7 +138,8 @@ export type UnlockId =
   | 'tick_200'
   | 'tick_120'
   | 'robot_2'
-  | 'calibration';
+  | 'calibration'
+  | 'sorting';
 
 export type ConceptId =
   | 'await'
@@ -142,6 +149,7 @@ export type ConceptId =
   | 'arrays'
   | 'objects'
   | 'for_of'
+  | 'sorting'
   // Reached by switching the cloud on rather than by playing.
   | 'promises'
   | 'fetch'
@@ -177,7 +185,7 @@ export interface Stats {
 }
 
 /** The production steps the throughput meter counts, in flow order. */
-export type StageId = 'seed' | 'mine' | 'smelt' | 'assemble';
+export type StageId = 'seed' | 'mine' | 'smelt' | 'assemble' | 'press';
 
 /** What one tick produced, per stage. The unit the ring buffer is made of. */
 export interface RateSample {

@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { GroundTile } from '../src/game/types';
-import { clear, craft, drop, mine, move, refine, scan, scanAt, seed, take, trade } from '../src/engine/commands';
+import {
+  clear,
+  craft,
+  drop,
+  load,
+  mine,
+  move,
+  press,
+  refine,
+  scan,
+  scanAt,
+  seed,
+  swapSlots,
+  take,
+  trade,
+} from '../src/engine/commands';
 import { setTile } from '../src/game/grid';
 import { BASE_YIELD, purityFor } from '../src/game/cultivation';
 import {
@@ -283,6 +298,54 @@ describe('refine', () => {
     const state = stateFromLayout(['..'], 0, 0);
     giveOre(robotOf(state), 'iron_ore', 3, 5);
     expect(expectFail(runTick(state, refine)).code).toBe('nothing_here');
+  });
+});
+
+describe('press', () => {
+  it('refuses to fire when the loaded slots are out of order', () => {
+    const state = stateFromLayout(['P.', '..'], 0, 0); // robot on the press
+    giveOre(robotOf(state), 'iron_ore', 1, 5);
+    giveOre(robotOf(state), 'iron_ore', 1, 2);
+    expectOk(runTick(state, load));
+    expectOk(runTick(state, load)); // slots: [5, 2, ...] — descending
+
+    expect(expectFail(runTick(state, press)).code).toBe('blocked');
+  });
+
+  it('fires once a reference bubble sort has ordered the slots', () => {
+    const state = stateFromLayout(['P.', '..'], 0, 0);
+    for (const purity of [5, 2, 8, 4]) giveOre(robotOf(state), 'iron_ore', 1, purity);
+    for (let k = 0; k < 4; k += 1) expectOk(runTick(state, load));
+
+    // A plain bubble sort over the slots, using scan to read and swapSlots to fix.
+    const slots = machineAt(state, 0, 0).slots ?? [];
+    for (let pass = 0; pass < slots.length; pass += 1) {
+      for (let i = 0; i < slots.length - 1; i += 1) {
+        const here = slots[i];
+        const next = slots[i + 1];
+        if (next && (!here || here.purity > next.purity)) {
+          expectOk(runTick(state, (ctx) => swapSlots(ctx, i, i + 1)));
+        }
+      }
+    }
+
+    const result = expectOk(runTick(state, press));
+    expect(result.value).toBe(4);
+    expect(robotOf(state).inventory['component']).toBe(4);
+    // Every slot is cleared once it fires.
+    expect(machineAt(state, 0, 0).slots?.every((slot) => slot === null)).toBe(true);
+  });
+
+  it('needs at least two loaded slots to fire', () => {
+    const state = stateFromLayout(['P.', '..'], 0, 0);
+    giveOre(robotOf(state), 'iron_ore', 1, 5);
+    expectOk(runTick(state, load));
+    expect(expectFail(runTick(state, press)).code).toBe('missing_input');
+  });
+
+  it('rejects a slot index out of range', () => {
+    const state = stateFromLayout(['P.', '..'], 0, 0);
+    expect(expectFail(runTick(state, (ctx) => swapSlots(ctx, 0, 99))).code).toBe('bad_argument');
   });
 });
 

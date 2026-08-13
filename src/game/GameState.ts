@@ -1,4 +1,5 @@
 import type { GameState, Grid, GroundTile, ResourceId, Robot, Tile, UnlockId } from './types';
+import { PRESS_SLOTS } from './types';
 import { expandGrid } from './grid';
 import { BASE_YIELD, purityFor } from './cultivation';
 
@@ -81,7 +82,7 @@ export const INITIAL_LAYOUT = [
   '...SA...',
   '..D.R...',
   '........',
-  '.I....C.',
+  '.I..P.C.',
   '........',
 ];
 
@@ -97,6 +98,15 @@ function tileFromChar(char: string, x: number, y: number): Tile {
       return { kind: 'machine', machine: 'seeder', input: {}, output: {}, job: null };
     case 'R':
       return { kind: 'machine', machine: 'refinery', input: {}, output: {}, job: null };
+    case 'P':
+      return {
+        kind: 'machine',
+        machine: 'press',
+        input: {},
+        output: {},
+        job: null,
+        slots: Array.from({ length: PRESS_SLOTS }, () => null),
+      };
     case 'I':
       return ripeGround('iron_ore', x, y);
     case 'C':

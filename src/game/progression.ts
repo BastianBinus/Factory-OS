@@ -163,6 +163,16 @@ export const UNLOCKS: UnlockDef[] = [
     commands: ['refine'],
     // No new concept: finding the maximum is arrays, already taught on grid_12.
   },
+  {
+    id: 'sorting',
+    label: 'Sorting bay',
+    description:
+      'The press has 8 slots and fires only when they climb by purity. load() and swapSlots(i, j) let you sort them.',
+    cost: { refined_ingot: 20, gear: 20 },
+    requiresUnlocks: ['calibration'],
+    commands: ['load', 'swapSlots', 'press'],
+    conceptId: 'sorting',
+  },
 ];
 
 export function getUnlock(id: UnlockId): UnlockDef | undefined {

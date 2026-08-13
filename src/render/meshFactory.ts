@@ -128,6 +128,7 @@ export class WorldMaterials {
       gear: new MeshStandardMaterial({ color: colorFor(palette, 'gear'), ...METAL }),
       seed_crystal: new MeshStandardMaterial({ color: colorFor(palette, 'seed_crystal'), ...METAL }),
       refined_ingot: new MeshStandardMaterial({ color: colorFor(palette, 'refined_ingot'), ...METAL }),
+      component: new MeshStandardMaterial({ color: colorFor(palette, 'component'), ...METAL }),
     };
   }
 
@@ -271,6 +272,8 @@ export function createMachine(
       return createSeeder(geometry, materials);
     case 'refinery':
       return createRefinery(geometry, materials);
+    case 'press':
+      return createPress(geometry, materials);
   }
 }
 
@@ -411,6 +414,37 @@ function createRefinery(geometry: WorldGeometry, materials: WorldMaterials): Mac
     animate(delta) {
       // The dial always drifts; it spins up while a batch is being judged.
       dial.rotation.z += delta * (busy ? 4 : 0.6);
+    },
+  };
+}
+
+function createPress(geometry: WorldGeometry, materials: WorldMaterials): MachineView {
+  const group = new Group();
+
+  const base = solid(geometry.machineBase, materials.metalDark);
+  const body = solid(geometry.smelterBody, materials.metal);
+  body.position.y = 0.3;
+
+  // A ram that punches down while the press fires.
+  const ram = solid(geometry.smelterStack, materials.accent);
+  ram.position.set(0, 0.7, 0);
+
+  group.add(base, body, ram);
+
+  let busy = false;
+  let phase = 0;
+  return {
+    group,
+    setBusy(next) {
+      busy = next;
+    },
+    animate(delta) {
+      if (busy) {
+        phase += delta * 6;
+        ram.position.y = 0.6 + Math.abs(Math.sin(phase)) * 0.14;
+      } else {
+        ram.position.y = 0.7;
+      }
     },
   };
 }

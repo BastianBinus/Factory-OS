@@ -62,8 +62,10 @@ const RESOURCE_KEYS: Record<ResourceId, PaletteKey> = {
   copper_ingot: 'ingotCopper',
   gear: 'gear',
   seed_crystal: 'seedCrystal',
-  // No token of its own yet — a refined ingot reads as bright metal for now.
+  // No token of their own yet — a refined ingot reads as bright metal, a
+  // component as a gear, until the art catches up.
   refined_ingot: 'metal',
+  component: 'gear',
 };
 
 export function colorFor(palette: WorldPalette, resource: ResourceId): Color {

@@ -5,12 +5,11 @@ import { ONBOARDING_DONE, primaryRobot, resetWorld } from './game/GameState';
 import type { GameState, GroundTile, UnlockId } from './game/types';
 import { buyUnlock, getUnlock, unlockedCommands } from './game/progression';
 import { cloudConcepts, markConceptSeen, unseenConcepts } from './game/concepts';
-import { loadOrCreate, localSavedAt, saveGame } from './game/saveLoad';
+import { loadOrCreate } from './game/saveLoad';
 import { isCloudConfigured } from './cloud/supabaseClient';
-import { currentEmail } from './cloud/session';
-import { pushSave } from './cloud/saveApi';
-import { syncWithCloud } from './cloud/sync';
+import { createSaveController } from './cloud/saveController';
 import { advanceWorld } from './engine/commands';
+import { recordSample } from './game/rates';
 import { runCommand } from './engine/dispatch';
 import { ActionQueue } from './engine/ActionQueue';
 import { TickScheduler } from './engine/TickScheduler';
@@ -32,6 +31,7 @@ import { Controls } from './ui/Controls';
 import { GuideBar } from './ui/GuideBar';
 import { Hud } from './ui/Hud';
 import { MissionPanel } from './ui/MissionPanel';
+import { RatesPanel } from './ui/RatesPanel';
 import { Onboarding } from './ui/Onboarding';
 import { ShopPanel } from './ui/ShopPanel';
 import { Toasts } from './ui/Toast';
@@ -271,6 +271,7 @@ function tick(): void {
   }
 
   advanceWorld(state);
+  recordSample(state);
   worldView.sync(state);
   paintStatus();
   renderPanels();
@@ -336,16 +337,22 @@ const missions = new MissionPanel({
   onOpenConcept: (concept) => conceptPanel.show(concept, false),
 });
 
+const rates = new RatesPanel({
+  parent: app,
+  onToggle: (open) => onPanelToggle('rates', open),
+});
+
 /**
- * The three overlays share one slot on the right, so opening one closes the
- * others. Two of them at once would leave nothing of the factory visible, and
- * watching the factory is the reason the panels are overlays in the first place.
+ * The overlays share one slot on the right, so opening one closes the others.
+ * Two of them at once would leave nothing of the factory visible, and watching
+ * the factory is the reason the panels are overlays in the first place.
  */
-function onPanelToggle(source: 'code' | 'shop' | 'missions', open: boolean): void {
+function onPanelToggle(source: 'code' | 'shop' | 'missions' | 'rates', open: boolean): void {
   if (open) {
     if (source !== 'code') codePanel.setOpen(false);
     if (source !== 'shop') shop.setOpen(false);
     if (source !== 'missions') missions.setOpen(false);
+    if (source !== 'rates') rates.setOpen(false);
     renderPanels();
     if (source === 'code') checkOnboarding();
   }
@@ -358,6 +365,7 @@ function onPanelToggle(source: 'code' | 'shop' | 'missions', open: boolean): voi
 function renderPanels(): void {
   if (shop.isOpen) shop.render(state);
   if (missions.isOpen) missions.render(state);
+  if (rates.isOpen) rates.render(state);
 }
 
 /** The two readouts that answer "how am I doing" — kept in step, always. */
@@ -447,6 +455,7 @@ const controls = new Controls({
 
 controls.addButton('Shop', 'Spend resources on commands and upgrades', () => shop.toggle());
 controls.addButton('Tech tree', 'The upgrade graph and what each node teaches', () => missions.toggle());
+controls.addButton('Throughput', 'Output per stage, and where the line is starved', () => rates.toggle());
 
 const accountButton = controls.addButton('Sign in', 'Keep this factory across browsers', () =>
   authPanel.toggle(),
@@ -542,99 +551,6 @@ function applyProgress(): void {
 
 // Saving -------------------------------------------------------------------------
 
-/** Long enough that a fast tick rate does not serialise the grid every frame. */
-const SAVE_DELAY_MS = 1000;
-let saveTimer: number | null = null;
-
-function scheduleSave(): void {
-  if (saveTimer !== null) return;
-  saveTimer = window.setTimeout(() => {
-    saveTimer = null;
-    saveGame(state);
-    scheduleCloudSave();
-  }, SAVE_DELAY_MS);
-}
-
-/** For the moments worth losing nothing over: an unlock, a mission, leaving. */
-function saveNow(): void {
-  if (saveTimer !== null) {
-    window.clearTimeout(saveTimer);
-    saveTimer = null;
-  }
-  saveGame(state);
-  pushCloudNow();
-}
-
-window.addEventListener('beforeunload', () => saveNow());
-
-// Cloud --------------------------------------------------------------------------
-
-/**
- * Signing in adds a copy of the save; it never becomes the only one. Every write
- * below happens after the local save, and every read is filtered through the same
- * conflict rules, so the worst a broken network can do is leave the cloud behind.
- * The game itself does not notice either way.
- */
-
-/** Long, because this is a network round trip and not a string in localStorage. */
-const CLOUD_SAVE_DELAY_MS = 20_000;
-
-let signedInAs: string | null = null;
-let cloudTimer: number | null = null;
-
-function paintAccount(email: string | null): void {
-  signedInAs = email;
-  authPanel.setEmail(email);
-  accountButton.textContent = email === null ? 'Sign in' : 'Account';
-  accountButton.title = email === null ? 'Keep this factory across browsers' : `Signed in as ${email}`;
-}
-
-function scheduleCloudSave(): void {
-  if (signedInAs === null || cloudTimer !== null) return;
-  cloudTimer = window.setTimeout(() => {
-    cloudTimer = null;
-    // Silent on failure on purpose: this fires on a timer the player never asked
-    // for, and a toast about the network every twenty seconds helps nobody.
-    void pushSave(state);
-  }, CLOUD_SAVE_DELAY_MS);
-}
-
-/** The moments worth a round trip immediately: an unlock, a mission, leaving. */
-function pushCloudNow(): void {
-  if (signedInAs === null) return;
-  if (cloudTimer !== null) {
-    window.clearTimeout(cloudTimer);
-    cloudTimer = null;
-  }
-  void pushSave(state).then((result) => {
-    if (!result.ok) codePanel.console.error('The cloud save was refused.', null, result.message);
-  });
-}
-
-async function syncNow(): Promise<void> {
-  if (signedInAs === null) return;
-
-  const outcome = await syncWithCloud({
-    state,
-    localSavedAt: localSavedAt(),
-    ask: (local, cloud) => conflictDialog.ask(local, cloud),
-    adopt: (next) => adoptCloudSave(next),
-  });
-
-  switch (outcome.kind) {
-    case 'failed':
-      toasts.show('Cloud sync failed', outcome.message, 'error');
-      codePanel.console.error('Cloud sync failed.', null, outcome.message);
-      return;
-    case 'adopted':
-      toasts.show('Cloud save loaded', 'This browser now matches the cloud.', 'success');
-      codePanel.console.system('The cloud save was further along, so it was loaded.');
-      return;
-    default:
-      codePanel.console.system('This factory is now in the cloud.');
-  }
-}
-
 /**
  * Installing a save that came from somewhere else. The state object is refilled
  * rather than replaced, because every module in this file holds a reference to it
@@ -653,15 +569,44 @@ function adoptCloudSave(next: GameState): void {
   worldView.snapRobots();
 }
 
-/** A session outlives a reload, so the button has to catch up with it at boot. */
-async function restoreAccount(): Promise<void> {
-  const email = await currentEmail();
-  if (email === null) return;
+/**
+ * Local and cloud saving live in their own module now. Everything that touches
+ * the running game is handed in here as a callback; the controller owns only the
+ * timers, the sign-in state and the network.
+ */
+const saveController = createSaveController({
+  state,
+  ask: (local, cloud) => conflictDialog.ask(local, cloud),
+  adopt: adoptCloudSave,
+  renderAccount: (email) => {
+    authPanel.setEmail(email);
+    accountButton.textContent = email === null ? 'Sign in' : 'Account';
+    accountButton.title =
+      email === null ? 'Keep this factory across browsers' : `Signed in as ${email}`;
+  },
+  system: (message) => codePanel.console.system(message),
+  error: (message, detail) => codePanel.console.error(message, null, detail),
+  toast: (title, body, kind) => toasts.show(title, body, kind),
+});
 
-  paintAccount(email);
-  codePanel.console.system(`Signed in as ${email}.`);
-  await syncNow();
+// Thin wrappers so the call sites above stay unchanged and keep hoisting.
+function scheduleSave(): void {
+  saveController.scheduleSave();
 }
+function saveNow(): void {
+  saveController.saveNow();
+}
+function syncNow(): Promise<void> {
+  return saveController.syncNow();
+}
+function paintAccount(email: string | null): void {
+  saveController.paintAccount(email);
+}
+function restoreAccount(): Promise<void> {
+  return saveController.restoreAccount();
+}
+
+window.addEventListener('beforeunload', () => saveNow());
 
 if (isCloudConfigured()) void restoreAccount();
 
@@ -770,9 +715,10 @@ document.addEventListener('keydown', (event) => {
       conceptPanel.close();
       return;
     }
-    if (shop.isOpen || missions.isOpen) {
+    if (shop.isOpen || missions.isOpen || rates.isOpen) {
       shop.setOpen(false);
       missions.setOpen(false);
+      rates.setOpen(false);
       return;
     }
     stopScript();

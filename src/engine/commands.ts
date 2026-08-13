@@ -22,6 +22,7 @@ import {
   totalItems,
 } from '../game/resources';
 import { findRunnableRecipe, getRecipe, recipesFor } from '../game/recipes';
+import { count } from '../game/rates';
 import { GROW_TICKS, isSeedable, purityFor, ripen, yieldFor } from '../game/cultivation';
 
 /**
@@ -129,6 +130,7 @@ export function seed(ctx: CommandContext, resource: unknown): CommandResult {
   // and know what it is worth before waiting for it.
   tile.yield = yieldFor(ctx.state.grid, ctx.robot.x, ctx.robot.y, resource);
   tile.purity = purityFor(ctx.robot.x, ctx.robot.y, ctx.state.tick);
+  count(ctx.state, 'seed', 1);
 
   return ok(resource, `seeded ${resource}`);
 }
@@ -171,6 +173,7 @@ function harvest(ctx: CommandContext, tile: GroundTile): CommandResult {
   addItems(ctx.robot.inventory, resource, haul);
   addItems(ctx.robot.inventory, 'seed_crystal', 1);
   ctx.state.stats.oreMined += haul;
+  count(ctx.state, 'mine', haul);
 
   tile.state = 'raw';
   tile.resource = null;
@@ -394,6 +397,8 @@ export function advanceWorld(state: GameState): void {
     if (recipe) {
       addItems(tile.output, recipe.output, recipe.outputAmount);
       addItems(state.stats.crafted, recipe.output, recipe.outputAmount);
+      if (tile.machine === 'smelter') count(state, 'smelt', recipe.outputAmount);
+      else if (tile.machine === 'assembler') count(state, 'assemble', recipe.outputAmount);
     }
     tile.job = null;
   }

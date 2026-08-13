@@ -146,6 +146,8 @@ describe('migration', () => {
     // 777 credits at the old price of three come back as 259 iron ore.
     expect(result.state.robots[0]?.inventory['iron_ore']).toBe(259);
     expect(result.state.inventoryCapacity).toBe(20);
+    // Migrated through to v4: the throughput ring buffer starts empty.
+    expect(result.state.history).toEqual([]);
   });
 });
 
@@ -273,5 +275,20 @@ describe('the cultivation and currency migrations', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.migratedFrom).toBeUndefined();
+  });
+
+  it('gives a v3 save an empty throughput history', () => {
+    const data = savedState();
+    data['version'] = 3;
+    delete data['history'];
+    delete data['tickProduced'];
+
+    const result = deserialize(JSON.stringify(data));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.migratedFrom).toBe(3);
+    expect(result.state.history).toEqual([]);
+    expect(result.state.tickProduced).toEqual({});
   });
 });

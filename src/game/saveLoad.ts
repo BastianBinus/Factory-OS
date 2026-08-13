@@ -111,6 +111,13 @@ const MIGRATIONS: Record<number, Migration> = {
     next['version'] = 3;
     return next;
   },
+
+  /**
+   * Instrumentation. The throughput meter reads a ring buffer of per-tick
+   * production that older saves never kept, so it simply starts empty and fills
+   * as the factory runs. Nothing the player earned depends on it.
+   */
+  3: (data) => ({ ...data, history: [], tickProduced: {}, version: 4 }),
 };
 
 export function serialize(state: GameState): string {
@@ -219,6 +226,10 @@ function fillGaps(state: Record<string, unknown> & GameState): void {
   if (typeof step !== 'number' || !Number.isFinite(step)) {
     state.onboardingStep = ONBOARDING_DONE;
   }
+  // The throughput ring buffer and its per-tick accumulator: absent in any save
+  // written before instrumentation, harmless to start empty.
+  if (!Array.isArray(state['history'])) state.history = [];
+  if (!isRecord(state['tickProduced'])) state.tickProduced = {};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

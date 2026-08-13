@@ -1,14 +1,16 @@
 import type { GameState } from '../game/types';
 import { RESOURCES, RESOURCE_IDS } from '../game/resources';
+import { windowRate } from '../game/rates';
 import { createThemeToggle } from './ThemeToggle';
 
 /**
- * The floating bar at the top: the fleet's cargo on the left, the tick counter
- * and the theme toggle on the right.
+ * The floating bar at the top: the fleet's cargo on the left, the throughput
+ * meter and tick counter on the right.
  *
  * Cargo is the wealth now — there is no separate money — so the pills double as
- * the balance the shop is spent from. A pill only exists while the fleet carries
- * that resource, so the bar shows the holds rather than a row of zeroes.
+ * the balance the shop is spent from. Beside the tick sits output/min over the
+ * last minute with an arrow for the change since the minute before: the number
+ * that moves when the player writes a better script.
  */
 
 export interface HudOptions {
@@ -19,6 +21,8 @@ export class Hud {
   readonly element: HTMLElement;
 
   private readonly cargo: HTMLElement;
+  private readonly rateOut: HTMLElement;
+  private readonly rateDelta: HTMLElement;
   private readonly tickOut: HTMLElement;
 
   private readonly pills = new Map<string, { root: HTMLElement; value: HTMLElement }>();
@@ -40,17 +44,45 @@ export class Hud {
     const spacer = document.createElement('span');
     spacer.className = 'hud__spacer';
 
+    const rateLabel = document.createElement('span');
+    rateLabel.className = 't-label';
+    rateLabel.textContent = 'Output/min';
+
+    this.rateOut = document.createElement('span');
+    this.rateOut.className = 'hud__rate';
+    this.rateOut.textContent = '0';
+
+    this.rateDelta = document.createElement('span');
+    this.rateDelta.className = 'hud__delta';
+
+    const rateGroup = document.createElement('div');
+    rateGroup.className = 'hud__group';
+    rateGroup.append(rateLabel, this.rateOut, this.rateDelta);
+
     this.tickOut = document.createElement('span');
     this.tickOut.className = 'hud__tick';
     this.tickOut.textContent = 'tick 0';
 
-    this.element.append(this.cargo, spacer, this.tickOut, createThemeToggle());
+    this.element.append(this.cargo, spacer, rateGroup, this.tickOut, createThemeToggle());
     options.parent.appendChild(this.element);
   }
 
   update(state: GameState): void {
     this.tickOut.textContent = `tick ${state.tick}`;
+    this.paintRate(state);
     this.paintCargo(state);
+  }
+
+  private paintRate(state: GameState): void {
+    const report = windowRate(state.history, state.tickRateMs);
+    this.rateOut.textContent = String(report.totalPerMinute);
+
+    // Only a real change is worth an arrow; a flat rate stays unadorned.
+    const up = report.delta > 0;
+    const down = report.delta < 0;
+    this.rateDelta.textContent = up || down ? `${up ? '↑' : '↓'} ${Math.abs(report.delta)}` : '';
+    this.rateDelta.classList.toggle('hud__delta--up', up);
+    this.rateDelta.classList.toggle('hud__delta--down', down);
   }
 
   private paintCargo(state: GameState): void {

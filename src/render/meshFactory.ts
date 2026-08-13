@@ -129,6 +129,7 @@ export class WorldMaterials {
       seed_crystal: new MeshStandardMaterial({ color: colorFor(palette, 'seed_crystal'), ...METAL }),
       refined_ingot: new MeshStandardMaterial({ color: colorFor(palette, 'refined_ingot'), ...METAL }),
       component: new MeshStandardMaterial({ color: colorFor(palette, 'component'), ...METAL }),
+      alloy: new MeshStandardMaterial({ color: colorFor(palette, 'alloy'), ...METAL }),
     };
   }
 
@@ -274,6 +275,8 @@ export function createMachine(
       return createRefinery(geometry, materials);
     case 'press':
       return createPress(geometry, materials);
+    case 'foundry':
+      return createFoundry(geometry, materials);
   }
 }
 
@@ -445,6 +448,35 @@ function createPress(geometry: WorldGeometry, materials: WorldMaterials): Machin
       } else {
         ram.position.y = 0.7;
       }
+    },
+  };
+}
+
+function createFoundry(geometry: WorldGeometry, materials: WorldMaterials): MachineView {
+  const group = new Group();
+
+  const base = solid(geometry.machineBase, materials.metalDark);
+  const crucible = solid(geometry.smelterBody, materials.metal);
+  crucible.position.y = 0.32;
+  crucible.scale.set(1.2, 1, 1.2);
+
+  // A pour spout glowing while it fires.
+  const heat = materials.heat.clone();
+  const spout = solid(geometry.smelterPort, heat);
+  spout.position.set(0, 0.44, 0.32);
+
+  group.add(base, crucible, spout);
+  group.userData['dispose'] = () => heat.dispose();
+
+  let busy = false;
+  return {
+    group,
+    setBusy(next) {
+      busy = next;
+      heat.emissiveIntensity = busy ? 1 : 0;
+    },
+    animate() {
+      /* the glow is set on busy; nothing to spin */
     },
   };
 }

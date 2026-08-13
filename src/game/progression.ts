@@ -174,12 +174,22 @@ export const UNLOCKS: UnlockDef[] = [
     conceptId: 'sorting',
   },
   {
+    id: 'foundry',
+    label: 'Foundry pour',
+    description:
+      'The foundry fires only when every smelter around it is hot in the same tick. scan() reads its order; pour() casts the alloy — one cold smelter fails the pour.',
+    cost: { component: 20, gear: 20 },
+    requiresUnlocks: ['sorting'],
+    commands: ['pour'],
+    // No new concept: reading an order object is objects, already taught on robot_2.
+  },
+  {
     id: 'routing',
     label: 'Pipe routing',
     description:
       'Impassable structures rise across the floor. move() has to route around them, and worldSize() gives the grid bounds to search within.',
-    cost: { refined_ingot: 30, gear: 25 },
-    requiresUnlocks: ['sorting'],
+    cost: { alloy: 15, gear: 25 },
+    requiresUnlocks: ['foundry'],
     commands: ['worldSize'],
     conceptId: 'recursion',
   },

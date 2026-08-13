@@ -449,6 +449,7 @@ const MACHINE_MARK: Record<MachineId, string> = {
   seeder: 'd',
   refinery: 'r',
   press: 'p',
+  foundry: 'f',
 };
 
 /**

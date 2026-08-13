@@ -66,6 +66,7 @@ const RESOURCE_KEYS: Record<ResourceId, PaletteKey> = {
   // component as a gear, until the art catches up.
   refined_ingot: 'metal',
   component: 'gear',
+  alloy: 'ingotCopper',
 };
 
 export function colorFor(palette: WorldPalette, resource: ResourceId): Color {

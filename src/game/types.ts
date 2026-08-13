@@ -14,12 +14,13 @@ export type ResourceId =
   | 'gear'
   | 'seed_crystal'
   | 'refined_ingot'
-  | 'component';
+  | 'component'
+  | 'alloy';
 
 /** The raw ores. These are the only resources carried as purity-bearing batches. */
 export type OreId = 'iron_ore' | 'copper_ore';
 
-export type MachineId = 'smelter' | 'assembler' | 'seeder' | 'refinery' | 'press';
+export type MachineId = 'smelter' | 'assembler' | 'seeder' | 'refinery' | 'press' | 'foundry';
 
 /** How many slots the sorting press has. */
 export const PRESS_SLOTS = 8;
@@ -147,6 +148,7 @@ export type UnlockId =
   | 'robot_2'
   | 'calibration'
   | 'sorting'
+  | 'foundry'
   | 'routing';
 
 export type ConceptId =

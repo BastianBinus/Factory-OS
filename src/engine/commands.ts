@@ -431,6 +431,58 @@ export function press(ctx: CommandContext): CommandResult {
   return ok(made, `pressed ${made} sorted slots into ${made} components`);
 }
 
+/**
+ * The foundry pour. It casts an alloy only when every smelter around it is hot —
+ * has finished a batch and is holding output — in the same tick, and there are at
+ * least `order.need` of them. One cold smelter fails the pour and, because a
+ * half-poured cast is scrap, empties every neighbouring smelter with it. So the
+ * player has to fire the whole ring and time the pour: whole-floor simultaneity.
+ */
+export function pour(ctx: CommandContext): CommandResult {
+  const tile = currentTile(ctx);
+  if (!tile || tile.kind !== 'machine' || tile.machine !== 'foundry') {
+    return fail('nothing_here', 'The robot has to stand on the foundry to pour.');
+  }
+
+  const smelters: { tile: MachineTile; x: number; y: number }[] = [];
+  for (const direction of ['north', 'east', 'south', 'west'] as const) {
+    const at = step(ctx.robot.x, ctx.robot.y, direction);
+    const neighbour = tileAt(ctx.state.grid, at.x, at.y);
+    if (neighbour?.kind === 'machine' && neighbour.machine === 'smelter') {
+      smelters.push({ tile: neighbour, x: at.x, y: at.y });
+    }
+  }
+
+  const need = tile.order?.need ?? smelters.length;
+  if (smelters.length < need) {
+    return fail('missing_input', `The foundry needs ${need} smelters around it; it has ${smelters.length}.`);
+  }
+
+  const cold = smelters.find((entry) => isEmpty(entry.tile.output));
+  if (cold) {
+    // A failed pour is scrap: every smelter around it is emptied.
+    for (const entry of smelters) entry.tile.output = {};
+    return fail(
+      'blocked',
+      `The smelter at ${cold.x},${cold.y} was cold, so the pour failed and the cast was scrapped.`,
+    );
+  }
+
+  // Every smelter is hot: consume one ingot from each and cast one alloy per smelter.
+  for (const entry of smelters) {
+    for (const id of RESOURCE_IDS) {
+      if ((entry.tile.output[id] ?? 0) > 0) {
+        removeItems(entry.tile.output, id, 1);
+        break;
+      }
+    }
+  }
+
+  const cast = smelters.length;
+  addItems(ctx.robot.inventory, 'alloy', cast);
+  return ok(cast, `poured ${cast} alloy from ${cast} hot smelters`);
+}
+
 /** How many of `from` buy one of `to` at the market. */
 export const TRADE_RATIO = 3;
 
@@ -538,6 +590,8 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
         ...(tile.slots
           ? { slots: tile.slots.map((slot) => (slot === null ? null : slot.purity)) }
           : {}),
+        // The foundry exposes its order — how many hot smelters a pour needs.
+        ...(tile.order ? { order: { ...tile.order } } : {}),
       };
     case 'market':
       return { type: 'market', x, y };

@@ -53,6 +53,10 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
     detail: 'await press()',
     info: 'Fire the press. It only works when the loaded slots climb by purity.',
   },
+  pour: {
+    detail: 'await pour()',
+    info: 'Cast alloy at the foundry. Every smelter around it must be hot in the same tick.',
+  },
   trade: {
     detail: "await trade('iron_ore', 'copper_ore')",
     info: 'Swap three of one ore for one of another. Market tile only.',

@@ -1,5 +1,6 @@
 import type { UnlockDef } from '../game/types';
-import { getMission, unlockForCommand } from '../game/progression';
+import { unlockForCommand } from '../game/progression';
+import { describeInventory, totalItems } from '../game/resources';
 
 /**
  * Raw JavaScript errors, translated into something a beginner can act on.
@@ -88,9 +89,9 @@ function explainMissingName(
 }
 
 function shopHint(unlock: UnlockDef): string {
-  const mission = unlock.requiresMission ? getMission(unlock.requiresMission) : undefined;
-  const where = unlock.cost > 0 ? `Buy it in the Shop for ${unlock.cost} cr` : 'Unlock it in the Shop';
-  return mission ? `${where}, after the mission "${mission.title}".` : `${where}.`;
+  return totalItems(unlock.cost) > 0
+    ? `Buy it in the Shop for ${describeInventory(unlock.cost)}.`
+    : 'Unlock it in the Shop.';
 }
 
 /**

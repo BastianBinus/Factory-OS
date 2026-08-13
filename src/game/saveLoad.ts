@@ -73,6 +73,44 @@ const MIGRATIONS: Record<number, Migration> = {
     next['version'] = 2;
     return next;
   },
+
+  /**
+   * Resources become the currency. Credits, the mission chain and sell() are
+   * gone. The metal the player earned comes back as iron ore at the old sell
+   * price of three, dropped into the first robot; the script and the unlocks
+   * (minus sell, which no longer exists) survive untouched. Nothing is lost —
+   * only re-denominated.
+   */
+  2: (data) => {
+    const next = { ...data };
+
+    const credits = next['credits'];
+    const robots = Array.isArray(next['robots']) ? next['robots'] : [];
+    const first = robots[0];
+    if (typeof credits === 'number' && credits > 0 && isRecord(first)) {
+      const inventory = isRecord(first['inventory']) ? { ...first['inventory'] } : {};
+      const held = typeof inventory['iron_ore'] === 'number' ? inventory['iron_ore'] : 0;
+      inventory['iron_ore'] = held + Math.floor(credits / 3);
+      first['inventory'] = inventory;
+    }
+
+    delete next['credits'];
+    delete next['completedMissions'];
+
+    if (isRecord(next['stats'])) {
+      const stats = { ...next['stats'] };
+      delete stats['creditsEarned'];
+      delete stats['itemsSold'];
+      next['stats'] = stats;
+    }
+
+    if (Array.isArray(next['unlocks'])) {
+      next['unlocks'] = next['unlocks'].filter((id) => id !== 'sell');
+    }
+
+    next['version'] = 3;
+    return next;
+  },
 };
 
 export function serialize(state: GameState): string {
@@ -192,14 +230,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * shallow enough that adding an optional field later does not invalidate saves.
  */
 function isGameState(data: Record<string, unknown>): data is Record<string, unknown> & GameState {
-  const numbers = ['version', 'tick', 'credits', 'tickRateMs', 'inventoryCapacity'];
+  const numbers = ['version', 'tick', 'tickRateMs', 'inventoryCapacity'];
   for (const key of numbers) {
     if (typeof data[key] !== 'number' || !Number.isFinite(data[key])) return false;
   }
 
   if (typeof data['script'] !== 'string') return false;
 
-  const arrays = ['robots', 'unlocks', 'completedMissions', 'seenConcepts'];
+  const arrays = ['robots', 'unlocks', 'seenConcepts'];
   for (const key of arrays) {
     if (!Array.isArray(data[key])) return false;
   }
@@ -212,7 +250,7 @@ function isGameState(data: Record<string, unknown>): data is Record<string, unkn
 
   const stats = data['stats'];
   if (!isRecord(stats)) return false;
-  for (const key of ['tilesMoved', 'oreMined', 'creditsEarned', 'itemsSold']) {
+  for (const key of ['tilesMoved', 'oreMined']) {
     if (typeof stats[key] !== 'number') return false;
   }
   if (!isRecord(stats['crafted'])) return false;

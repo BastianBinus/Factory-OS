@@ -1,15 +1,18 @@
 import type { GameState } from '../game/types';
 import { ONBOARDING_DONE } from '../game/GameState';
-import { activeMission, getUnlock, missionProgress } from '../game/progression';
+import { getConcept } from '../game/concepts';
+import { missingResources } from '../game/economy';
+import { nextUnlock } from '../game/progression';
+import { describeInventory, totalItems } from '../game/resources';
 
 /**
  * One line, always on screen, answering the only question a new player actually
- * has: what am I supposed to be doing right now.
+ * has: what am I working toward right now.
  *
- * The mission log says the same thing in more detail, but a drawer you have to
- * open is a drawer you forget exists. This is the smallest version of it that
- * still says what to do, how far along you are, and what you get — and clicking
- * it opens the full log.
+ * There are no missions to track, so this points at the next node the tech tree
+ * makes reachable — what it costs, how close the fleet is to affording it, and
+ * what it teaches. Clicking it opens the full tree. It is a signpost, never an
+ * instruction: nothing here tells the player what to do, only what is next.
  *
  * It stays out of the way while the tutorial is running: two boxes of
  * instructions at once is one box too many.
@@ -33,7 +36,7 @@ export class GuideBar {
     this.element = document.createElement('button');
     this.element.type = 'button';
     this.element.className = 'guide';
-    this.element.title = 'Open the mission log';
+    this.element.title = 'Open the tech tree';
     this.element.addEventListener('click', options.onOpen);
 
     const label = document.createElement('span');
@@ -65,27 +68,27 @@ export class GuideBar {
   update(state: GameState): void {
     this.element.hidden = state.onboardingStep < ONBOARDING_DONE;
 
-    const mission = activeMission(state);
-    if (!mission) {
-      this.title.textContent = 'Every mission is done';
-      this.text.textContent = 'The shop still has upgrades left.';
+    const next = nextUnlock(state);
+    if (!next) {
+      this.title.textContent = 'The tree is bought out';
+      this.text.textContent = 'Every upgrade is yours. Now make it faster.';
       this.count.textContent = '';
       this.reward.textContent = '';
       this.fill.style.width = '100%';
       return;
     }
 
-    const progress = missionProgress(state, mission);
-    const share = progress.target === 0 ? 1 : progress.current / progress.target;
+    // How close the fleet is to affording it, so the bar fills as ore comes in.
+    const need = totalItems(next.cost);
+    const short = totalItems(missingResources(state, next.cost));
+    const share = need === 0 ? 1 : (need - short) / need;
 
-    this.title.textContent = mission.title;
-    this.text.textContent = mission.summary;
-    this.count.textContent = `${progress.current} / ${progress.target}`;
+    this.title.textContent = `Next: ${next.label}`;
+    this.text.textContent = next.description;
+    this.count.textContent = describeInventory(next.cost);
     this.fill.style.width = `${Math.round(share * 100)}%`;
 
-    const grants = mission.grants.map((id) => getUnlock(id)?.label ?? id);
-    // The credits are the boring half of the reward; the new command is the
-    // reason to keep going, so it is the half that gets the space.
-    this.reward.textContent = grants.length > 0 ? `Unlocks ${grants.join(', ')}` : `${mission.rewardCredits} cr`;
+    const concept = next.conceptId ? getConcept(next.conceptId) : undefined;
+    this.reward.textContent = concept ? `Teaches ${concept.title}` : '';
   }
 }

@@ -1,4 +1,6 @@
 import type { GameState } from '../game/types';
+import { totalResources } from '../game/economy';
+import { totalItems } from '../game/resources';
 
 /**
  * Deciding which save survives when the browser and the cloud disagree.
@@ -23,7 +25,10 @@ export type SaveSummary = {
   /** Epoch milliseconds. Zero means unknown, which sorts oldest. */
   savedAt: number;
   tick: number;
-  credits: number;
+  /** Everything the fleet carries — the currency now, in place of credits. */
+  resources: number;
+  /** How many tech-tree nodes are owned. The one axis that only ever climbs. */
+  unlocks: number;
 };
 
 export type Resolution =
@@ -32,12 +37,17 @@ export type Resolution =
   | { kind: 'ask'; local: SaveSummary; cloud: SaveSummary };
 
 export function summarise(state: GameState, savedAt: number): SaveSummary {
-  return { savedAt, tick: state.tick, credits: state.credits };
+  return {
+    savedAt,
+    tick: state.tick,
+    resources: totalItems(totalResources(state)),
+    unlocks: state.unlocks.length,
+  };
 }
 
 /** True when `a` is at least as far along as `b` on every axis. */
 function covers(a: SaveSummary, b: SaveSummary): boolean {
-  return a.tick >= b.tick && a.credits >= b.credits;
+  return a.tick >= b.tick && a.resources >= b.resources && a.unlocks >= b.unlocks;
 }
 
 export function resolveSaves(

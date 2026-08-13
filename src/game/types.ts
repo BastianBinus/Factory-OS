@@ -90,7 +90,6 @@ export interface ResourceDef {
   label: string;
   /** CSS custom property name (without --) used for the colour dot and the mesh. */
   colorToken: string;
-  sellPrice: number;
 }
 
 export type UnlockId =
@@ -98,7 +97,7 @@ export type UnlockId =
   | 'mine'
   | 'cultivate'
   | 'drop'
-  | 'sell'
+  | 'trade'
   | 'wait'
   | 'print'
   | 'scan'
@@ -139,52 +138,28 @@ export interface UnlockDef {
   id: UnlockId;
   label: string;
   description: string;
-  cost: number;
+  /** What it costs to buy, paid straight out of harvested resources. Empty = free. */
+  cost: Inventory;
   /** Command names this unlock exposes to the player script, if any. */
   commands?: string[];
-  /** Mission that must be completed before this can be bought. */
-  requiresMission?: MissionId;
-  /** Other unlocks that must be owned first. */
+  /** Other unlocks that must be owned first. The tech tree is the only gate. */
   requiresUnlocks?: UnlockId[];
   /** JS concept explained when this unlock becomes available. */
-  conceptId?: ConceptId;
-}
-
-export type MissionId = 'm1_move' | 'm2_mine' | 'm3_earn' | 'm4_smelt' | 'm5_gears' | 'm6_rich';
-
-export type MissionGoal =
-  | { type: 'move'; target: number }
-  | { type: 'mine'; target: number }
-  | { type: 'credits_earned'; target: number }
-  | { type: 'crafted'; resource: ResourceId; target: number };
-
-export interface MissionDef {
-  id: MissionId;
-  title: string;
-  summary: string;
-  goal: MissionGoal;
-  rewardCredits: number;
-  /** Unlocks granted for free on completion. */
-  grants: UnlockId[];
   conceptId?: ConceptId;
 }
 
 export interface Stats {
   tilesMoved: number;
   oreMined: number;
-  creditsEarned: number;
-  itemsSold: number;
   crafted: Inventory;
 }
 
 export interface GameState {
   version: number;
   tick: number;
-  credits: number;
   grid: Grid;
   robots: Robot[];
   unlocks: UnlockId[];
-  completedMissions: MissionId[];
   /**
    * Concept ids already shown to the player. Deliberately loose strings: a save
    * from an older build may name a concept this one no longer has, and that is

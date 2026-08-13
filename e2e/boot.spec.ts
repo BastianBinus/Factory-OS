@@ -17,7 +17,7 @@ test('boots into a rendered factory', async ({ page }) => {
 
   await expect(page.locator('canvas')).toBeVisible();
   await expect(page.locator('.fallback')).toHaveCount(0);
-  await expect(page.locator('.hud__credits')).toBeVisible();
+  await expect(page.locator('.hud')).toBeVisible();
 
   expect(crashes).toEqual([]);
 });

@@ -3,7 +3,7 @@ import './boot.css';
 import { initTheme, onThemeChange } from './ui/ThemeToggle';
 import { ONBOARDING_DONE, primaryRobot, resetWorld } from './game/GameState';
 import type { GameState, GroundTile, UnlockId } from './game/types';
-import { buyUnlock, evaluateMissions, getUnlock, unlockedCommands } from './game/progression';
+import { buyUnlock, getUnlock, unlockedCommands } from './game/progression';
 import { cloudConcepts, markConceptSeen, unseenConcepts } from './game/concepts';
 import { loadOrCreate, localSavedAt, saveGame } from './game/saveLoad';
 import { isCloudConfigured } from './cloud/supabaseClient';
@@ -111,7 +111,6 @@ function snapshotOf(robotId: string): StateSnapshot {
     y: robot?.y ?? 0,
     facing: robot?.facing ?? 'south',
     inventory: { ...(robot?.inventory ?? {}) },
-    credits: state.credits,
     tick: state.tick,
   };
 }
@@ -272,7 +271,6 @@ function tick(): void {
   }
 
   advanceWorld(state);
-  settleProgress();
   worldView.sync(state);
   paintStatus();
   renderPanels();
@@ -447,8 +445,8 @@ const controls = new Controls({
   onCode: () => codePanel.toggle(),
 });
 
-controls.addButton('Shop', 'Spend credits on commands and upgrades', () => shop.toggle());
-controls.addButton('Missions', 'The mission chain and what it unlocks', () => missions.toggle());
+controls.addButton('Shop', 'Spend resources on commands and upgrades', () => shop.toggle());
+controls.addButton('Tech tree', 'The upgrade graph and what each node teaches', () => missions.toggle());
 
 const accountButton = controls.addButton('Sign in', 'Keep this factory across browsers', () =>
   authPanel.toggle(),
@@ -481,24 +479,6 @@ function resetFloor(note: string): void {
 }
 
 // Progression ------------------------------------------------------------------
-
-/**
- * Hands out every mission whose goal is now met. Called after each tick, which
- * is the only moment the counters can move — a reward that arrives a tick late
- * would be a reward the player cannot connect to what they just did.
- */
-function settleProgress(): void {
-  const completions = evaluateMissions(state);
-  if (completions.length === 0) return;
-
-  for (const completion of completions) {
-    codePanel.console.system(`Mission complete: ${completion.mission.title} (+${completion.credits} cr)`);
-    toasts.show(`Mission complete: ${completion.mission.title}`, `+${completion.credits} cr`, 'success');
-    for (const id of completion.granted) announceUnlock(id);
-  }
-
-  applyProgress();
-}
 
 function buy(id: UnlockId): void {
   const result = buyUnlock(state, id);

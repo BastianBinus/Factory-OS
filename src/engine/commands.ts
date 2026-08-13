@@ -11,6 +11,7 @@ import type {
 } from '../game/types';
 import { inBounds, isDirection, step, tileAt } from '../game/grid';
 import {
+  RESOURCES,
   RESOURCE_IDS,
   addItems,
   cloneInventory,
@@ -21,7 +22,6 @@ import {
   totalItems,
 } from '../game/resources';
 import { findRunnableRecipe, getRecipe, recipesFor } from '../game/recipes';
-import { sellAll } from '../game/economy';
 import { GROW_TICKS, isSeedable, purityFor, ripen, yieldFor } from '../game/cultivation';
 
 /**
@@ -274,18 +274,42 @@ export function take(ctx: CommandContext): CommandResult {
   return ok(taken, `took ${describeInventory(taken)}`);
 }
 
-export function sell(ctx: CommandContext): CommandResult {
+/** How many of `from` buy one of `to` at the market. */
+export const TRADE_RATIO = 3;
+
+export function trade(ctx: CommandContext, from: unknown, to: unknown): CommandResult {
   const tile = currentTile(ctx);
 
   if (!tile || tile.kind !== 'market') {
-    return fail('nothing_here', 'The robot has to stand on the market tile to sell.');
+    return fail('nothing_here', 'The robot has to stand on the market tile to trade.');
   }
-  if (isEmpty(ctx.robot.inventory)) {
-    return fail('inventory_empty', 'The robot is not carrying anything to sell.');
+  if (!isResourceId(from) || !isResourceId(to)) {
+    return fail(
+      'bad_argument',
+      `trade() needs two resource names — got (${JSON.stringify(from)}, ${JSON.stringify(to)}).`,
+    );
+  }
+  if (from === to) {
+    return fail('bad_argument', 'trade() needs two different resources.');
   }
 
-  const sale = sellAll(ctx.state, ctx.robot.inventory);
-  return ok(sale.credits, `sold ${describeInventory(sale.sold)} for ${sale.credits} cr`);
+  const held = ctx.robot.inventory[from] ?? 0;
+  if (held < TRADE_RATIO) {
+    return fail(
+      'missing_input',
+      `trade() turns ${TRADE_RATIO} ${RESOURCES[from].label.toLowerCase()} into 1 ${RESOURCES[to].label.toLowerCase()}, and the robot has ${held}.`,
+    );
+  }
+
+  // Three in for one out only ever shrinks the load, so capacity never bites.
+  const out = Math.floor(held / TRADE_RATIO);
+  removeItems(ctx.robot.inventory, from, out * TRADE_RATIO);
+  addItems(ctx.robot.inventory, to, out);
+
+  return ok(
+    out,
+    `traded ${out * TRADE_RATIO} ${RESOURCES[from].label.toLowerCase()} for ${out} ${RESOURCES[to].label.toLowerCase()}`,
+  );
 }
 
 export function wait(): CommandResult {

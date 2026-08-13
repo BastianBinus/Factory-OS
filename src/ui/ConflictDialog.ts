@@ -126,7 +126,8 @@ function fill(root: HTMLElement, summary: SaveSummary, now: number): void {
 
   facts.replaceChildren();
   addFact(facts, 'Ticks', String(summary.tick));
-  addFact(facts, 'Credits', String(summary.credits));
+  addFact(facts, 'Resources', String(summary.resources));
+  addFact(facts, 'Unlocks', String(summary.unlocks));
   addFact(facts, 'Saved', describeAge(summary.savedAt, now));
 }
 

@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { explainError } from '../src/engine/errorHints';
-import { getMission, getUnlock } from '../src/game/progression';
 
 /** What a fresh save can call. Everything else is genuinely absent from the API. */
 const STARTING = [
   'clear',
-  'credits',
   'inventory',
   'mine',
   'move',
@@ -24,26 +22,17 @@ describe('locked commands', () => {
     );
 
     expect(hint.message).toBe('drop() is not unlocked yet.');
-    expect(hint.detail).toContain(`${getUnlock('drop')?.cost} cr`);
+    expect(hint.detail).toContain('Shop');
     expect(hint.line).toBe(4);
-  });
-
-  it('names the mission that stands in the way', () => {
-    const hint = explainError(
-      { name: 'ReferenceError', message: 'drop is not defined', line: 1 },
-      STARTING,
-    );
-
-    expect(hint.detail).toContain(getMission('m2_mine')!.title);
   });
 
   it('reads the same complaint from Safari', () => {
     const hint = explainError(
-      { name: 'ReferenceError', message: "Can't find variable: sell", line: 2 },
+      { name: 'ReferenceError', message: "Can't find variable: craft", line: 2 },
       STARTING,
     );
 
-    expect(hint.message).toBe('sell() is not unlocked yet.');
+    expect(hint.message).toBe('craft() is not unlocked yet.');
   });
 
   it('reads it from a call that resolved to something uncallable', () => {

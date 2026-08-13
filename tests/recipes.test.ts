@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RECIPES, findRunnableRecipe, getRecipe, recipesFor } from '../src/game/recipes';
-import { RESOURCES, isResourceId } from '../src/game/resources';
+import { isResourceId } from '../src/game/resources';
 
 describe('recipe table', () => {
   it('has a unique id per recipe', () => {
@@ -15,31 +15,6 @@ describe('recipe table', () => {
         expect(isResourceId(id)).toBe(true);
       }
     }
-  });
-
-  function inputValueOf(recipe: (typeof RECIPES)[number]): number {
-    return Object.entries(recipe.inputs).reduce(
-      (sum, [id, amount]) => sum + RESOURCES[id as keyof typeof RESOURCES].sellPrice * amount,
-      0,
-    );
-  }
-
-  it('is worth crafting — output sells for more than the inputs', () => {
-    for (const recipe of RECIPES) {
-      // The seed crystal is the one thing here that is made to be used, not
-      // sold, so it is held to the weaker rule in the next test instead.
-      if (recipe.output === 'seed_crystal') continue;
-      const outputValue = RESOURCES[recipe.output].sellPrice * recipe.outputAmount;
-      expect(outputValue, recipe.id).toBeGreaterThan(inputValueOf(recipe));
-    }
-  });
-
-  it('prices the seed crystal at exactly what it cost to make', () => {
-    const recipe = getRecipe('craft_seed_crystal');
-    expect(recipe).toBeDefined();
-    // Not a profit and not a trap: a player who crafts a crystal and changes
-    // their mind gets their ore back at face value.
-    expect(RESOURCES.seed_crystal.sellPrice * recipe!.outputAmount).toBe(inputValueOf(recipe!));
   });
 
   it('costs time', () => {

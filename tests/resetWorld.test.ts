@@ -12,14 +12,13 @@ function messUpTheFloor(state: GameState): void {
   const robot = state.robots[0];
   if (!robot) throw new Error('the initial state should have a robot');
 
-  // The robot starts on a ripe patch; harvesting it leaves the tile raw.
+  // The robot starts on a ripe patch; harvesting it fills its cargo and leaves
+  // the tile raw. That cargo is the currency now, so it must survive the reset.
   mine({ state, robot });
   move({ state, robot }, 'south');
 
   state.tick = 412;
-  state.credits = 1340;
-  state.unlocks.push('sell');
-  state.completedMissions.push('m1_move');
+  state.unlocks.push('wait');
   state.stats.oreMined = 3;
 
   const smelter = state.grid.tiles.find((tile) => tile.kind === 'machine') as MachineTile;
@@ -29,10 +28,12 @@ function messUpTheFloor(state: GameState): void {
 }
 
 describe('resetWorld', () => {
-  it('parks the robot back on its starting tile, empty-handed', () => {
+  it('parks the robot back on its starting tile but keeps its cargo', () => {
     const state = createInitialState();
     const start = { ...state.robots[0]! };
     messUpTheFloor(state);
+    const carried = { ...state.robots[0]!.inventory };
+    expect(Object.keys(carried).length).toBeGreaterThan(0);
 
     resetWorld(state);
 
@@ -40,7 +41,8 @@ describe('resetWorld', () => {
     expect(robot.x).toBe(start.x);
     expect(robot.y).toBe(start.y);
     expect(robot.facing).toBe('south');
-    expect(robot.inventory).toEqual({});
+    // The harvest is the currency now — resetting the floor must not spend it.
+    expect(robot.inventory).toEqual(carried);
   });
 
   it('puts the harvested starting patches back', () => {
@@ -81,16 +83,16 @@ describe('resetWorld', () => {
     expect(state.tick).toBe(0);
   });
 
-  it('keeps everything the player earned', () => {
+  it('keeps everything the player earned, resources included', () => {
     const state = createInitialState();
     messUpTheFloor(state);
+    const carried = { ...state.robots[0]!.inventory };
 
     resetWorld(state);
 
-    expect(state.credits).toBe(1340);
-    expect(state.unlocks).toContain('sell');
-    expect(state.completedMissions).toContain('m1_move');
-    // Missions count lifetime totals, so wiping stats would undo progress.
+    expect(state.robots[0]!.inventory).toEqual(carried);
+    expect(state.unlocks).toContain('wait');
+    // Lifetime totals stay, so a reset never rolls back progress.
     expect(state.stats.oreMined).toBe(3);
   });
 

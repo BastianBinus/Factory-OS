@@ -2,7 +2,7 @@ import type { GameState, Grid, GroundTile, ResourceId, Robot, Tile, UnlockId } f
 import { expandGrid } from './grid';
 import { BASE_YIELD, purityFor } from './cultivation';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export const DEFAULT_TICK_RATE_MS = 400;
 export const DEFAULT_CAPACITY = 10;
@@ -164,14 +164,12 @@ export function createInitialState(): GameState {
   return {
     version: SAVE_VERSION,
     tick: 0,
-    credits: 0,
     grid: gridFromLayout(INITIAL_LAYOUT),
     robots: [createRobot('r1', start.x, start.y)],
     unlocks: [...STARTING_UNLOCKS],
-    completedMissions: [],
     seenConcepts: [],
     onboardingStep: 0,
-    stats: { tilesMoved: 0, oreMined: 0, creditsEarned: 0, itemsSold: 0, crafted: {} },
+    stats: { tilesMoved: 0, oreMined: 0, crafted: {} },
     script: STARTER_SCRIPT,
     tickRateMs: DEFAULT_TICK_RATE_MS,
     inventoryCapacity: DEFAULT_CAPACITY,
@@ -179,13 +177,16 @@ export function createInitialState(): GameState {
 }
 
 /**
- * Puts the factory floor back to how a run finds it: robots parked, ore full,
- * machines and inventories empty, tick counter at zero.
+ * Puts the factory floor back to how a run finds it: robots parked at their
+ * start, ripe patches full, tick counter at zero.
  *
- * What it deliberately leaves alone is everything the player *earned* — credits,
- * unlocks, mission progress, the lifetime stats those missions count, and the
- * grid size. Resetting is for making a script repeatable, not for giving up
- * progress; that distinction is the whole reason this is not `createInitialState`.
+ * What it deliberately leaves alone is everything the player *earned* — now
+ * including **the resources the robots carry**, because those are the currency.
+ * Wiping them on every run would erase the harvest the moment you pressed Run,
+ * and "every harvested unit is permanent progress" is the whole point of the
+ * economy. Unlocks, lifetime stats and the grid size stay for the same reason.
+ * Resetting makes a script repeatable; it does not give up progress. That is
+ * why this is not `createInitialState`.
  */
 export function resetWorld(state: GameState): void {
   // expandGrid is seeded by the grid size, so a rebuilt 12x12 is the same 12x12.
@@ -197,7 +198,6 @@ export function resetWorld(state: GameState): void {
     robot.x = start.x;
     robot.y = start.y;
     robot.facing = 'south';
-    robot.inventory = {};
   });
 
   state.tick = 0;

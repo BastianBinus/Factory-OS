@@ -1,5 +1,5 @@
 import type { ConceptDef, ConceptId, GameState } from './types';
-import { MISSIONS, UNLOCKS } from './progression';
+import { UNLOCKS } from './progression';
 import { hasUnlock } from './GameState';
 
 /**
@@ -212,19 +212,15 @@ export function conceptNumber(id: ConceptId): number {
 }
 
 /**
- * Concepts the player has arrived at: something they own or have finished
- * introduces it. A concept can be carried by more than one row — scan() and the
- * mission that precedes it both point at `if_else` — so whichever comes first
- * opens it, and the other simply finds it already reached.
+ * Concepts the player has arrived at: an unlock they own introduces it. Each
+ * concept now hangs from exactly one tech-tree node — the one whose mechanic
+ * first makes the idea useful — so owning that node is what opens the lesson.
  */
 export function reachedConcepts(state: GameState): ConceptDef[] {
   const reached = new Set<ConceptId>();
 
   for (const unlock of UNLOCKS) {
     if (unlock.conceptId && hasUnlock(state, unlock.id)) reached.add(unlock.conceptId);
-  }
-  for (const mission of MISSIONS) {
-    if (mission.conceptId && state.completedMissions.includes(mission.id)) reached.add(mission.conceptId);
   }
   // Seen is what reached means for these — see CLOUD_CONCEPT_IDS.
   for (const id of CLOUD_CONCEPT_IDS) {

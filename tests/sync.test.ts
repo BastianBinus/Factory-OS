@@ -13,10 +13,10 @@ import type { PullResult } from '../src/cloud/saveApi';
  * value on its own.
  */
 
-function stateAt(tick: number, credits: number): GameState {
+function stateAt(tick: number, resources: number): GameState {
   const state = createInitialState();
   state.tick = tick;
-  state.credits = credits;
+  state.robots[0]!.inventory = { iron_ore: resources };
   return state;
 }
 

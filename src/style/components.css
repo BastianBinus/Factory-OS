@@ -334,6 +334,60 @@
   border-bottom-left-radius: 8px;
 }
 
+/* Throughput ------------------------------------------------------------- */
+
+.rates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.rates__row {
+  display: grid;
+  grid-template-columns: 84px 1fr 40px;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.rates__label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rates__bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.rates__fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width var(--t-base) var(--ease);
+}
+
+.rates__value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text);
+}
+
+.rates__note {
+  margin: var(--sp-4) 0 0;
+  font-size: 12px;
+  color: var(--danger, var(--text-muted));
+}
+
 /* Panels ----------------------------------------------------------------- */
 
 .panel {
@@ -374,11 +428,26 @@
   box-shadow: var(--sh-2);
 }
 
-.hud__credits {
+.hud__rate {
   font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+.hud__delta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.hud__delta--up {
+  color: var(--success);
+}
+
+.hud__delta--down {
+  color: var(--danger, var(--text-muted));
 }
 
 .hud__spacer {
@@ -390,21 +459,6 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
-}
-
-/* A gain flashes the value rather than counting it up. */
-@keyframes gain-flash {
-  from {
-    background: var(--accent-soft);
-  }
-  to {
-    background: transparent;
-  }
-}
-
-.is-gain {
-  animation: gain-flash var(--t-base) var(--ease);
-  border-radius: var(--r-control);
 }
 
 /* Console ---------------------------------------------------------------- */

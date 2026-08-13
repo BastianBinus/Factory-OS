@@ -11,6 +11,7 @@ import { currentEmail } from './cloud/session';
 import { pushSave } from './cloud/saveApi';
 import { syncWithCloud } from './cloud/sync';
 import { advanceWorld } from './engine/commands';
+import { recordSample } from './game/rates';
 import { runCommand } from './engine/dispatch';
 import { ActionQueue } from './engine/ActionQueue';
 import { TickScheduler } from './engine/TickScheduler';
@@ -32,6 +33,7 @@ import { Controls } from './ui/Controls';
 import { GuideBar } from './ui/GuideBar';
 import { Hud } from './ui/Hud';
 import { MissionPanel } from './ui/MissionPanel';
+import { RatesPanel } from './ui/RatesPanel';
 import { Onboarding } from './ui/Onboarding';
 import { ShopPanel } from './ui/ShopPanel';
 import { Toasts } from './ui/Toast';
@@ -271,6 +273,7 @@ function tick(): void {
   }
 
   advanceWorld(state);
+  recordSample(state);
   worldView.sync(state);
   paintStatus();
   renderPanels();
@@ -336,16 +339,22 @@ const missions = new MissionPanel({
   onOpenConcept: (concept) => conceptPanel.show(concept, false),
 });
 
+const rates = new RatesPanel({
+  parent: app,
+  onToggle: (open) => onPanelToggle('rates', open),
+});
+
 /**
- * The three overlays share one slot on the right, so opening one closes the
- * others. Two of them at once would leave nothing of the factory visible, and
- * watching the factory is the reason the panels are overlays in the first place.
+ * The overlays share one slot on the right, so opening one closes the others.
+ * Two of them at once would leave nothing of the factory visible, and watching
+ * the factory is the reason the panels are overlays in the first place.
  */
-function onPanelToggle(source: 'code' | 'shop' | 'missions', open: boolean): void {
+function onPanelToggle(source: 'code' | 'shop' | 'missions' | 'rates', open: boolean): void {
   if (open) {
     if (source !== 'code') codePanel.setOpen(false);
     if (source !== 'shop') shop.setOpen(false);
     if (source !== 'missions') missions.setOpen(false);
+    if (source !== 'rates') rates.setOpen(false);
     renderPanels();
     if (source === 'code') checkOnboarding();
   }
@@ -358,6 +367,7 @@ function onPanelToggle(source: 'code' | 'shop' | 'missions', open: boolean): voi
 function renderPanels(): void {
   if (shop.isOpen) shop.render(state);
   if (missions.isOpen) missions.render(state);
+  if (rates.isOpen) rates.render(state);
 }
 
 /** The two readouts that answer "how am I doing" — kept in step, always. */
@@ -447,6 +457,7 @@ const controls = new Controls({
 
 controls.addButton('Shop', 'Spend resources on commands and upgrades', () => shop.toggle());
 controls.addButton('Tech tree', 'The upgrade graph and what each node teaches', () => missions.toggle());
+controls.addButton('Throughput', 'Output per stage, and where the line is starved', () => rates.toggle());
 
 const accountButton = controls.addButton('Sign in', 'Keep this factory across browsers', () =>
   authPanel.toggle(),
@@ -770,9 +781,10 @@ document.addEventListener('keydown', (event) => {
       conceptPanel.close();
       return;
     }
-    if (shop.isOpen || missions.isOpen) {
+    if (shop.isOpen || missions.isOpen || rates.isOpen) {
       shop.setOpen(false);
       missions.setOpen(false);
+      rates.setOpen(false);
       return;
     }
     stopScript();

@@ -14,12 +14,13 @@ export type ResourceId =
   | 'gear'
   | 'seed_crystal'
   | 'refined_ingot'
-  | 'component';
+  | 'component'
+  | 'alloy';
 
 /** The raw ores. These are the only resources carried as purity-bearing batches. */
 export type OreId = 'iron_ore' | 'copper_ore';
 
-export type MachineId = 'smelter' | 'assembler' | 'seeder' | 'refinery' | 'press';
+export type MachineId = 'smelter' | 'assembler' | 'seeder' | 'refinery' | 'press' | 'foundry';
 
 /** How many slots the sorting press has. */
 export const PRESS_SLOTS = 8;
@@ -77,13 +78,30 @@ export interface MachineTile {
   job: MachineJob | null;
   /** The press's ordered slots. `null` on every other machine. */
   slots?: (Batch | null)[];
+  /** The foundry's pour order: how many hot smelters it needs. Absent elsewhere. */
+  order?: { need: number };
 }
 
 export interface MarketTile {
   kind: 'market';
 }
 
-export type Tile = GroundTile | MachineTile | MarketTile;
+/** An impassable structure. The routing tier drops these in to force a search. */
+export interface WallTile {
+  kind: 'wall';
+}
+
+/**
+ * A conveyor belt. Each tick the world moves its item one step along `direction`,
+ * onto the next empty belt or into a machine that accepts it — no robot needed.
+ */
+export interface BeltTile {
+  kind: 'belt';
+  direction: Direction;
+  item: ResourceId | null;
+}
+
+export type Tile = GroundTile | MachineTile | MarketTile | WallTile | BeltTile;
 
 export interface Robot {
   id: string;
@@ -139,7 +157,10 @@ export type UnlockId =
   | 'tick_120'
   | 'robot_2'
   | 'calibration'
-  | 'sorting';
+  | 'sorting'
+  | 'foundry'
+  | 'routing'
+  | 'belts';
 
 export type ConceptId =
   | 'await'
@@ -150,6 +171,7 @@ export type ConceptId =
   | 'objects'
   | 'for_of'
   | 'sorting'
+  | 'recursion'
   // Reached by switching the cloud on rather than by playing.
   | 'promises'
   | 'fetch'

@@ -118,6 +118,8 @@ function snapshotOf(robotId: string): StateSnapshot {
     facing: robot?.facing ?? 'south',
     inventory,
     tick: state.tick,
+    width: state.grid.width,
+    height: state.grid.height,
   };
 }
 

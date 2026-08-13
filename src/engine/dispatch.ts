@@ -1,12 +1,14 @@
 import type { CommandResult } from '../game/types';
 import type { CommandContext } from './commands';
 import {
+  belt,
   clear,
   craft,
   drop,
   load,
   mine,
   move,
+  pour,
   press,
   refine,
   scan,
@@ -39,6 +41,8 @@ const RUNNERS: Record<string, CommandRunner> = {
   load: (ctx) => load(ctx),
   swapSlots: (ctx, args) => swapSlots(ctx, args[0], args[1]),
   press: (ctx) => press(ctx),
+  pour: (ctx) => pour(ctx),
+  belt: (ctx, args) => belt(ctx, args[0]),
   trade: (ctx, args) => trade(ctx, args[0], args[1]),
   wait: () => wait(),
   scan: (ctx) => scan(ctx),

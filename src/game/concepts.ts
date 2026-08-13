@@ -136,6 +136,32 @@ for (let pass = 0; pass < 8; pass++) {
 await press();`,
   },
   {
+    id: 'recursion',
+    title: 'Search — finding a path through the walls',
+    body:
+      'When walls block the straight route, you have to search for a way around. A breadth-first ' +
+      'search fans out from the start one ring at a time, remembering where it came from, until it ' +
+      'reaches the goal — and the first time it arrives is always by a shortest path. Keep a queue ' +
+      'of tiles to visit and a set of the ones already seen, and you never walk in circles.',
+    codeExample: `// Breadth-first search from [sx, sy] to [gx, gy].
+const { width, height } = worldSize();
+const seen = new Set([sx + ',' + sy]);
+const queue = [[sx, sy]];
+
+while (queue.length > 0) {
+  const [x, y] = queue.shift();
+  if (x === gx && y === gy) break;
+  for (const [nx, ny] of neighbours(x, y)) {
+    const key = nx + ',' + ny;
+    const tile = await scanAt(nx, ny);
+    if (tile.type !== 'wall' && !seen.has(key)) {
+      seen.add(key);
+      queue.push([nx, ny]);
+    }
+  }
+}`,
+  },
+  {
     id: 'promises',
     title: 'Promises — the thing await was waiting for',
     body:

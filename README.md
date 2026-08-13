@@ -246,8 +246,8 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 10b | Resources become the currency; credits and the mission chain removed | done |
 | 10c | Throughput meter and bottleneck graphs (absorbs 9c) | done |
 | 10d | Calibration and sorting bay — the first mandatory algorithms | done |
-| 10e | Foundry pour and pipe routing | designed |
-| 10f | Conveyor belts (absorbs 9b) | designed |
+| 10e | Foundry pour and pipe routing | done |
+| 10f | Conveyor belts (absorbs 9b) | done |
 | 9d | Script library with real modules | planned |
 
 Phase 10 reworks the gameplay loop along the lines of *The Farmer Was Replaced*: the player plants

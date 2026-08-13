@@ -129,6 +129,7 @@ export class WorldMaterials {
       seed_crystal: new MeshStandardMaterial({ color: colorFor(palette, 'seed_crystal'), ...METAL }),
       refined_ingot: new MeshStandardMaterial({ color: colorFor(palette, 'refined_ingot'), ...METAL }),
       component: new MeshStandardMaterial({ color: colorFor(palette, 'component'), ...METAL }),
+      alloy: new MeshStandardMaterial({ color: colorFor(palette, 'alloy'), ...METAL }),
     };
   }
 
@@ -274,6 +275,8 @@ export function createMachine(
       return createRefinery(geometry, materials);
     case 'press':
       return createPress(geometry, materials);
+    case 'foundry':
+      return createFoundry(geometry, materials);
   }
 }
 
@@ -449,6 +452,35 @@ function createPress(geometry: WorldGeometry, materials: WorldMaterials): Machin
   };
 }
 
+function createFoundry(geometry: WorldGeometry, materials: WorldMaterials): MachineView {
+  const group = new Group();
+
+  const base = solid(geometry.machineBase, materials.metalDark);
+  const crucible = solid(geometry.smelterBody, materials.metal);
+  crucible.position.y = 0.32;
+  crucible.scale.set(1.2, 1, 1.2);
+
+  // A pour spout glowing while it fires.
+  const heat = materials.heat.clone();
+  const spout = solid(geometry.smelterPort, heat);
+  spout.position.set(0, 0.44, 0.32);
+
+  group.add(base, crucible, spout);
+  group.userData['dispose'] = () => heat.dispose();
+
+  let busy = false;
+  return {
+    group,
+    setBusy(next) {
+      busy = next;
+      heat.emissiveIntensity = busy ? 1 : 0;
+    },
+    animate() {
+      /* the glow is set on busy; nothing to spin */
+    },
+  };
+}
+
 export function createMarket(geometry: WorldGeometry, materials: WorldMaterials): Group {
   const group = new Group();
 
@@ -471,6 +503,36 @@ export function createMarket(geometry: WorldGeometry, materials: WorldMaterials)
   roof.position.y = 0.68;
 
   group.add(deck, trim, roof);
+  return group;
+}
+
+export function createBelt(
+  geometry: WorldGeometry,
+  materials: WorldMaterials,
+  direction: 'north' | 'east' | 'south' | 'west',
+): Group {
+  const group = new Group();
+  const deck = solid(geometry.machineBase, materials.metalDark);
+  deck.scale.set(1, 0.3, 1);
+  // A thin accent bar pointing the way the belt runs.
+  const arrow = solid(geometry.smelterPort, materials.accent);
+  arrow.position.y = 0.12;
+  arrow.scale.set(0.5, 0.3, 1.4);
+  const turn: Record<string, number> = { north: 0, south: Math.PI, east: -Math.PI / 2, west: Math.PI / 2 };
+  arrow.rotation.y = turn[direction] ?? 0;
+  group.add(deck, arrow);
+  return group;
+}
+
+export function createWall(geometry: WorldGeometry, materials: WorldMaterials): Group {
+  const group = new Group();
+  // A plain solid block, dark, that fills its tile. Placeholder art; the point is
+  // that it is obviously impassable.
+  const base = solid(geometry.machineBase, materials.metalDark);
+  const block = solid(geometry.smelterBody, materials.metalDark);
+  block.position.y = 0.4;
+  block.scale.set(1.35, 1.4, 1.35);
+  group.add(base, block);
   return group;
 }
 

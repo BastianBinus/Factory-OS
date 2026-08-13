@@ -25,6 +25,7 @@ import {
   createMachine,
   createMarket,
   createRobot,
+  createWall,
 } from './meshFactory';
 import type { Scene } from './Scene';
 
@@ -206,6 +207,8 @@ export class WorldView {
       }
       case 'market':
         return { group: createMarket(this.geometry, this.materials) };
+      case 'wall':
+        return { group: createWall(this.geometry, this.materials) };
       default:
         return null;
     }
@@ -463,7 +466,9 @@ export function gridSignature(grid: Grid): string {
     .map((tile) => {
       if (tile.kind === 'ground') return '.';
       if (tile.kind === 'machine') return MACHINE_MARK[tile.machine];
-      return tile.kind === 'market' ? 'm' : '.';
+      if (tile.kind === 'market') return 'm';
+      if (tile.kind === 'wall') return 'w';
+      return '.';
     })
     .join('');
   return `${grid.width}x${grid.height}:${kinds}`;

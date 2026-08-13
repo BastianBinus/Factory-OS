@@ -151,6 +151,8 @@ const EMPTY_SNAPSHOT: StateSnapshot = {
   facing: 'south',
   inventory: {},
   tick: 0,
+  width: 0,
+  height: 0,
 };
 
 interface PendingAction {

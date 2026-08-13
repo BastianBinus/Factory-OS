@@ -77,13 +77,20 @@ export interface MachineTile {
   job: MachineJob | null;
   /** The press's ordered slots. `null` on every other machine. */
   slots?: (Batch | null)[];
+  /** The foundry's pour order: how many hot smelters it needs. Absent elsewhere. */
+  order?: { need: number };
 }
 
 export interface MarketTile {
   kind: 'market';
 }
 
-export type Tile = GroundTile | MachineTile | MarketTile;
+/** An impassable structure. The routing tier drops these in to force a search. */
+export interface WallTile {
+  kind: 'wall';
+}
+
+export type Tile = GroundTile | MachineTile | MarketTile | WallTile;
 
 export interface Robot {
   id: string;
@@ -139,7 +146,8 @@ export type UnlockId =
   | 'tick_120'
   | 'robot_2'
   | 'calibration'
-  | 'sorting';
+  | 'sorting'
+  | 'routing';
 
 export type ConceptId =
   | 'await'
@@ -150,6 +158,7 @@ export type ConceptId =
   | 'objects'
   | 'for_of'
   | 'sorting'
+  | 'recursion'
   // Reached by switching the cloud on rather than by playing.
   | 'promises'
   | 'fetch'

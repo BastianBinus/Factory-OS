@@ -63,6 +63,7 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
   print: { detail: 'print(value)', info: 'Write a value into the console. Costs no tick.' },
   position: { detail: 'position()', info: 'The robot position as {x, y}. Costs no tick.' },
   inventory: { detail: 'inventory()', info: 'What the robot carries. Costs no tick.' },
+  worldSize: { detail: 'worldSize()', info: 'The factory bounds as {width, height}. Costs no tick.' },
   me: {
     detail: 'me()',
     info: 'Which robot is running this copy of the script, as {id, index}. Costs no tick.',

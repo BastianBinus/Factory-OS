@@ -22,6 +22,9 @@ export interface StateSnapshot {
   facing: string;
   inventory: Record<string, number>;
   tick: number;
+  /** Grid bounds, for worldSize(). Lets a search know how far the floor goes. */
+  width: number;
+  height: number;
 }
 
 export interface RunMessage {

@@ -1,6 +1,6 @@
 import type { GameState, UnlockDef, UnlockId } from './types';
 import { createRobot, grantUnlock, hasUnlock } from './GameState';
-import { expandGrid, forEachTile } from './grid';
+import { expandGrid, forEachTile, setTile, tileAt } from './grid';
 import { canAfford, missingResources, spendResources } from './economy';
 import { describeInventory, totalItems } from './resources';
 
@@ -173,6 +173,16 @@ export const UNLOCKS: UnlockDef[] = [
     commands: ['load', 'swapSlots', 'press'],
     conceptId: 'sorting',
   },
+  {
+    id: 'routing',
+    label: 'Pipe routing',
+    description:
+      'Impassable structures rise across the floor. move() has to route around them, and worldSize() gives the grid bounds to search within.',
+    cost: { refined_ingot: 30, gear: 25 },
+    requiresUnlocks: ['sorting'],
+    commands: ['worldSize'],
+    conceptId: 'recursion',
+  },
 ];
 
 export function getUnlock(id: UnlockId): UnlockDef | undefined {
@@ -311,8 +321,29 @@ export function applyUnlockEffect(state: GameState, id: UnlockId): void {
     case 'robot_2':
       addRobot(state);
       break;
+    case 'routing':
+      raiseWalls(state);
+      break;
     default:
       break;
+  }
+}
+
+/**
+ * Drops a wall down the middle of the floor, leaving the top and bottom rows open
+ * as the only way around. Deterministic, and it only ever converts open ground —
+ * never a machine, a robot's tile or the market — so nothing the player built is
+ * lost and no robot is walled in.
+ */
+function raiseWalls(state: GameState): void {
+  const col = Math.floor(state.grid.width / 2);
+  const taken = new Set(state.robots.map((robot) => `${robot.x},${robot.y}`));
+
+  for (let y = 1; y < state.grid.height - 1; y += 1) {
+    const tile = tileAt(state.grid, col, y);
+    if (!tile || tile.kind !== 'ground') continue;
+    if (taken.has(`${col},${y}`)) continue;
+    setTile(state.grid, col, y, { kind: 'wall' });
   }
 }
 

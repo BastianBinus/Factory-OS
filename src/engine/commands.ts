@@ -85,6 +85,9 @@ export function move(ctx: CommandContext, direction: unknown): CommandResult {
   if (!inBounds(ctx.state.grid, target.x, target.y)) {
     return fail('blocked', `The robot cannot move ${direction} — that is the edge of the factory.`);
   }
+  if (tileAt(ctx.state.grid, target.x, target.y)?.kind === 'wall') {
+    return fail('blocked', `A wall blocks the way ${direction}. The robot has to route around it.`);
+  }
 
   ctx.robot.x = target.x;
   ctx.robot.y = target.y;
@@ -538,6 +541,8 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
       };
     case 'market':
       return { type: 'market', x, y };
+    case 'wall':
+      return { type: 'wall', x, y };
     default:
       return { type: 'unknown', x, y };
   }

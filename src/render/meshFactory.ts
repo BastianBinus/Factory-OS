@@ -474,6 +474,18 @@ export function createMarket(geometry: WorldGeometry, materials: WorldMaterials)
   return group;
 }
 
+export function createWall(geometry: WorldGeometry, materials: WorldMaterials): Group {
+  const group = new Group();
+  // A plain solid block, dark, that fills its tile. Placeholder art; the point is
+  // that it is obviously impassable.
+  const base = solid(geometry.machineBase, materials.metalDark);
+  const block = solid(geometry.smelterBody, materials.metalDark);
+  block.position.y = 0.4;
+  block.scale.set(1.35, 1.4, 1.35);
+  group.add(base, block);
+  return group;
+}
+
 export function createRobot(geometry: WorldGeometry, materials: WorldMaterials): Group {
   const group = new Group();
 

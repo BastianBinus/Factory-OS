@@ -94,9 +94,9 @@ function render(): void {
           <div class="t-label">Label · 11 / 600 / uppercase</div>
           <div class="t-display">Display · 20 / 600 — Assembler online</div>
           <div class="t-title">Title · 15 / 600 — Production chain</div>
-          <div class="t-body">Body · 13 / 450 — The robot mines ore, carries it to the smelter and sells the ingots at the market.</div>
+          <div class="t-body">Body · 13 / 450 — The robot mines ore, carries it to the smelter and feeds the ingots to the assembler.</div>
           <div class="t-prose">Prose · 14 / 1.65 — Used inside concept panels, where the text is meant to be read rather than scanned.</div>
-          <div class="t-num">Numeric · 15 / 600 / tabular — 1 240 cr · 0041 ticks</div>
+          <div class="t-num">Numeric · 15 / 600 / tabular — 180/min · 0041 ticks</div>
           <pre class="concept__code">while (true) {
   await move('north');
   if (await scan() === 'iron_ore') {
@@ -138,7 +138,7 @@ function render(): void {
           <div class="sg__row">
             <button class="btn btn--primary">Run</button>
             <button class="btn">Pause</button>
-            <button class="btn btn--ghost">Missions</button>
+            <button class="btn btn--ghost">Tech tree</button>
             <button class="btn btn--danger">Stop</button>
             <button class="btn" disabled>Unavailable</button>
           </div>
@@ -150,7 +150,8 @@ function render(): void {
               <span class="btn-group__sep"></span>
               <button class="btn">Code</button>
               <button class="btn">Shop</button>
-              <button class="btn">Missions</button>
+              <button class="btn">Tech tree</button>
+              <button class="btn">Throughput</button>
             </div>
           </div>
           <div class="sg__row t-body t-muted">
@@ -163,80 +164,104 @@ function render(): void {
         'HUD',
         `<div class="sg__demo">
           <div class="hud">
-            <span class="hud__credits">1 240 <span class="t-label">cr</span></span>
             <span class="pill"><span class="pill__dot" style="background: var(--w-ore-iron)"></span><span class="pill__label">iron ore</span><span class="pill__value">12</span></span>
             <span class="pill"><span class="pill__dot" style="background: var(--w-ingot-copper)"></span><span class="pill__label">copper ingot</span><span class="pill__value">4</span></span>
             <span class="pill"><span class="pill__dot" style="background: var(--w-gear)"></span><span class="pill__label">gear</span><span class="pill__value">0</span></span>
             <span class="hud__spacer"></span>
+            <div class="hud__group"><span class="t-label">Output/min</span><span class="hud__rate">180</span><span class="hud__delta hud__delta--up">↑ 40</span></div>
             <span class="hud__tick">tick 0041</span>
             <span class="js-theme-toggle"></span>
           </div>
         </div>`,
+        'The cargo pills are the wealth — there is no separate money. On the right, output per minute over the last window, with an arrow for the change since the window before.',
       )}
 
       ${section(
         'Shop cards',
         `<div class="sg__cards">
           <div class="card card--affordable">
-            <div class="card__head"><span class="t-title">scan()</span><span class="card__price">120 cr</span></div>
-            <p class="t-body t-muted">Read what is on the tile the robot stands on.</p>
-            <div class="card__actions"><code class="card__grants">scan()</code><span class="card__spacer"></span><button class="btn btn--sm">Buy</button></div>
+            <div class="card__head"><span class="t-title">trade(from, to)</span><span class="card__price">10 iron ore</span></div>
+            <p class="t-body t-muted">Swap three of one ore for one of another. Market tile only.</p>
+            <div class="card__actions"><code class="card__grants">trade()</code><span class="card__spacer"></span><button class="btn btn--sm">Buy</button></div>
           </div>
           <div class="card">
-            <div class="card__head"><span class="t-title">craft() and take()</span><span class="card__price">180 cr</span></div>
+            <div class="card__head"><span class="t-title">craft() and take()</span><span class="card__price">25 iron ore</span></div>
             <p class="t-body t-muted">Start the machine below the robot, and collect what it produced.</p>
+            <p class="card__note">Short 5 iron ore.</p>
             <div class="card__actions"><code class="card__grants">craft() take()</code><span class="card__spacer"></span><button class="btn btn--sm" disabled>Buy</button></div>
           </div>
           <div class="card card--owned">
-            <div class="card__head"><span class="t-title">sell()</span><span class="card__check">Owned</span></div>
-            <p class="t-body t-muted">Sell everything the robot carries.</p>
-            <div class="card__actions"><code class="card__grants">sell()</code></div>
+            <div class="card__head"><span class="t-title">scan()</span><span class="card__check">Owned</span></div>
+            <p class="t-body t-muted">Read what is on the tile the robot stands on.</p>
+            <div class="card__actions"><code class="card__grants">scan()</code></div>
           </div>
           <div class="card card--locked">
-            <div class="card__head"><span class="t-title">Second robot</span><span class="card__price">5 000 cr</span></div>
+            <div class="card__head"><span class="t-title">Second robot</span><span class="card__price">20 gear · 15 copper ingot</span></div>
             <p class="t-body t-muted">A second robot rolls off the ramp.</p>
-            <p class="card__note">Locked until the mission "Industrialist" is done.</p>
+            <p class="card__note">Needs Factory floor 16 x 16 first.</p>
             <div class="card__actions"><span class="card__spacer"></span><button class="btn btn--sm" disabled>Buy</button></div>
           </div>
         </div>`,
-        'A card only says out loud what the price tag cannot. "Too expensive" gets no sentence — the price and the balance in the drawer header already carry that.',
+        'A card is priced in the material it takes. When the fleet cannot cover it, the shortfall is named; a missing prerequisite node is named instead.',
       )}
 
       ${section(
-        'Missions',
-        `<div class="sg__demo sg__stack">
-          <div class="mission mission--done">
-            <div class="mission__head"><span class="t-title">First steps</span><span class="mission__status">Done</span></div>
-            <p class="t-body t-muted">Drive the robot across 20 tiles.</p>
-            <div class="progress"><i class="progress__fill" style="width: 100%"></i></div>
-            <p class="mission__reward">Reward: 40 cr · sell()</p>
-          </div>
-          <div class="mission mission--active">
-            <div class="mission__head"><span class="t-title">Dig in</span><span class="mission__status">9 / 15</span></div>
-            <p class="t-body t-muted">Mine 15 units of ore and sell them at the market.</p>
-            <div class="progress"><i class="progress__fill" style="width: 60%"></i></div>
-            <p class="mission__reward">Reward: 60 cr · wait()</p>
-          </div>
-          <div class="mission">
-            <div class="mission__head"><span class="t-title">Turning a profit</span><span class="mission__status">0 / 200</span></div>
-            <p class="t-body t-muted">Earn 200 credits in total.</p>
-            <div class="progress"><i class="progress__fill" style="width: 0%"></i></div>
-            <p class="mission__reward">Reward: 100 cr</p>
-          </div>
+        'Tech tree',
+        `<div class="sg__demo">
+          <ul class="tree">
+            <li class="tree__node">
+              <div class="mission mission--done">
+                <div class="mission__head"><span class="t-title">scan()</span><span class="mission__status">Owned</span></div>
+                <p class="t-body t-muted">Read the tile below the robot.</p>
+                <p class="mission__reward">Free</p>
+              </div>
+              <ul class="tree__kids">
+                <li class="tree__node">
+                  <div class="mission mission--active">
+                    <div class="mission__head"><span class="t-title">scanAt(x, y)</span><span class="mission__status">Ready</span></div>
+                    <p class="t-body t-muted">Read any tile in the factory.</p>
+                    <p class="mission__reward">Costs 15 iron ingot · teaches If / else</p>
+                  </div>
+                </li>
+              </ul>
+            </li>
+            <li class="tree__node">
+              <div class="mission">
+                <div class="mission__head"><span class="t-title">Cargo rack</span><span class="mission__status">Saving</span></div>
+                <p class="t-body t-muted">The robot carries 20 items instead of 10.</p>
+                <p class="mission__reward">Costs 10 iron ingot</p>
+                <p class="mission__reward">Short 4 iron ingot.</p>
+              </div>
+            </li>
+          </ul>
         </div>`,
-        'Only the mission being worked on carries the accent bar. The whole chain stays visible, including missions far ahead — seeing that gears come after ingots is what makes the next command worth buying.',
+        'There are no missions. The tree is the whole goal structure: each node is indented under the one it needs, and its price tag is the objective. A descendant is wired to its prerequisite with an elbow connector.',
+      )}
+
+      ${section(
+        'Throughput',
+        `<div class="sg__demo">
+          <ul class="rates">
+            <li class="rates__row"><span class="rates__label">Seeding</span><span class="rates__bar"><i class="rates__fill" style="width: 45%"></i></span><span class="rates__value">18</span></li>
+            <li class="rates__row"><span class="rates__label">Mining</span><span class="rates__bar"><i class="rates__fill" style="width: 100%"></i></span><span class="rates__value">40</span></li>
+            <li class="rates__row"><span class="rates__label">Smelting</span><span class="rates__bar"><i class="rates__fill" style="width: 0%"></i></span><span class="rates__value">0</span></li>
+            <li class="rates__row"><span class="rates__label">Assembly</span><span class="rates__bar"><i class="rates__fill" style="width: 15%"></i></span><span class="rates__value">6</span></li>
+          </ul>
+          <p class="rates__note">smelt is starved: material is waiting but nothing is coming out.</p>
+        </div>`,
+        'One bar per production stage, its length its share of the busiest stage. When a stage has material waiting yet produces nothing, it is named as the bottleneck.',
       )}
 
       ${section(
         'Console',
         `<div class="sg__console console">
           <div class="console__line console__line--print">iron_ore: 7</div>
-          <div class="console__line console__line--system">Unlocked sell() — try it from the market tile.</div>
+          <div class="console__line console__line--system">Unlocked: trade() now works in the editor.</div>
           <div class="console__line console__line--error">
-            <span class="console__text">mine is not defined</span>
+            <span class="console__text">craft is not defined</span>
             <button class="console__jump" type="button">line 4</button>
           </div>
-          <div class="console__line console__line--error console__line--detail">mine() is not unlocked yet. Finish the mission that grants it, or buy it in the Shop.</div>
+          <div class="console__line console__line--error console__line--detail">craft() is not unlocked yet. Buy it in the Shop for 25 iron ore.</div>
         </div>`,
         'Three kinds of line, each with a coloured bar so they separate without being read: what the script printed, what the game says, what went wrong. An error carries the line it happened on as a button that jumps the editor there, and the advice goes underneath in a quieter voice — never instead of the message.',
       )}
@@ -246,11 +271,11 @@ function render(): void {
         `<div class="sg__demo sg__stack">
           <button class="guide" type="button">
             <span class="t-label">Now</span>
-            <span class="guide__title">Dig in</span>
-            <span class="guide__text">Mine 15 units of ore and sell them at the market in the north-west corner.</span>
+            <span class="guide__title">Next: Cargo rack</span>
+            <span class="guide__text">The robot carries 20 items instead of 10.</span>
             <span class="progress guide__progress"><i class="progress__fill" style="width: 60%"></i></span>
-            <span class="guide__count">9 / 15</span>
-            <span class="guide__reward">Unlocks wait()</span>
+            <span class="guide__count">10 iron ingot</span>
+            <span class="guide__reward">Teaches Arrays</span>
           </button>
           <aside class="coach" style="position: static; width: 320px">
             <div class="coach__head">
@@ -265,7 +290,7 @@ function render(): void {
             <li><button class="conceptlink"><span class="conceptlink__no">2</span><span>while — repeating without repeating yourself</span></button></li>
           </ul>
         </div>`,
-        'The guide line is the smallest honest answer to "what now": the mission, how far along, and what it pays. The coach card only appears for the first three steps and every step waits for the player to actually do the thing — there is no Next button, because a tutorial you can click through teaches the clicking.',
+        'The guide line is the smallest honest answer to "what now": the next reachable node, what it costs, and what it teaches. The coach card only appears for the first three steps and every step waits for the player to actually do the thing — there is no Next button, because a tutorial you can click through teaches the clicking.',
       )}
 
       ${section(
@@ -291,7 +316,7 @@ function render(): void {
             <span class="t-body"><code>scan()</code> is now available in the editor.</span>
           </div>
         </div>`,
-        'The one modal in the game, and the only thing allowed to dim the factory. It appears once per concept, then lives in the mission log where it can be re-read without the interruption.',
+        'The one modal in the game, and the only thing allowed to dim the factory. It appears once per concept, then lives in the tech tree where it can be re-read without the interruption.',
       )}
     </div>
   `;

@@ -444,6 +444,8 @@ const MACHINE_MARK: Record<MachineId, string> = {
   smelter: 's',
   assembler: 'a',
   seeder: 'd',
+  refinery: 'r',
+  press: 'p',
 };
 
 /**

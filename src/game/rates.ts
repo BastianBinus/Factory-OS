@@ -11,7 +11,7 @@ import type { GameState, RateSample, StageId } from './types';
  */
 
 /** The stages the meter shows, in the order material flows through them. */
-export const STAGES: StageId[] = ['seed', 'mine', 'smelt', 'assemble'];
+export const STAGES: StageId[] = ['seed', 'mine', 'smelt', 'assemble', 'press'];
 
 /** Most samples kept. At 250 ms/tick that is a full minute; faster, a little less. */
 export const HISTORY_LIMIT = 240;
@@ -48,7 +48,7 @@ export interface RateReport {
 
 /** Sums a slice of samples into per-stage totals. */
 function sumOver(samples: RateSample[]): Record<StageId, number> {
-  const totals = { seed: 0, mine: 0, smelt: 0, assemble: 0 };
+  const totals = { seed: 0, mine: 0, smelt: 0, assemble: 0, press: 0 };
   for (const sample of samples) {
     for (const stage of STAGES) totals[stage] += sample.produced[stage] ?? 0;
   }

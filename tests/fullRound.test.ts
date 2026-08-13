@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { clear, craft, drop, mine, seed, take } from '../src/engine/commands';
 import { createInitialState, hasUnlock } from '../src/game/GameState';
 import { GROW_TICKS } from '../src/game/cultivation';
+import { oreCount } from '../src/game/batches';
 import { totalResources } from '../src/game/economy';
 import { buyUnlock } from '../src/game/progression';
 import { deserialize, serialize } from '../src/game/saveLoad';
@@ -22,12 +23,15 @@ describe('a full production round', () => {
 
     // 1 — the robot starts standing on a ripe iron patch
     expectOk(runTick(state, mine));
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 3, seed_crystal: 1 });
+    expect(robotOf(state).inventory).toEqual({ seed_crystal: 1 });
+    expect(oreCount(robotOf(state), 'iron_ore')).toBe(3);
 
     // 2 — copper from the south-east corner
     walkTo(state, 6, 6);
     expectOk(runTick(state, mine));
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 3, copper_ore: 3, seed_crystal: 2 });
+    expect(robotOf(state).inventory).toEqual({ seed_crystal: 2 });
+    expect(oreCount(robotOf(state), 'iron_ore')).toBe(3);
+    expect(oreCount(robotOf(state), 'copper_ore')).toBe(3);
 
     // 3 — load the smelter and run it six times
     walkTo(state, 3, 3);
@@ -99,7 +103,8 @@ describe('a full production round', () => {
       idle(state, GROW_TICKS.iron_ore ?? 0);
     }
 
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 9 });
+    expect(robotOf(state).inventory).toEqual({});
+    expect(oreCount(robotOf(state), 'iron_ore')).toBe(9);
     expect(state.stats.oreMined).toBe(9);
   });
 });

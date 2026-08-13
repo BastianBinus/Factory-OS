@@ -71,14 +71,14 @@ function rawGround(): Record<string, unknown> {
  */
 export function currentSave(script: string, size = 8): Record<string, unknown> {
   return {
-    version: 4,
+    version: 5,
     tick: 0,
     grid: {
       width: size,
       height: size,
       tiles: Array.from({ length: size * size }, () => rawGround()),
     },
-    robots: [{ id: 'r1', x: 4, y: 4, facing: 'south', inventory: { seed_crystal: 2 } }],
+    robots: [{ id: 'r1', x: 4, y: 4, facing: 'south', inventory: { seed_crystal: 2 }, batches: [] }],
     unlocks: ['move', 'mine', 'print', 'scan', 'cultivate'],
     history: [],
     tickProduced: {},

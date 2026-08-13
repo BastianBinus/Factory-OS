@@ -94,6 +94,11 @@ export class Hud {
         const amount = robot.inventory[id] ?? 0;
         if (amount > 0) carried.set(id, (carried.get(id) ?? 0) + amount);
       }
+      // Ore is carried in batches, not the count inventory, but a pill only shows
+      // a total, so the purities fold together here.
+      for (const batch of robot.batches) {
+        carried.set(batch.resource, (carried.get(batch.resource) ?? 0) + batch.amount);
+      }
     }
 
     this.empty.hidden = carried.size > 0;

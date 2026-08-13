@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Inventory, UnlockId } from '../src/game/types';
 import { createInitialState, hasUnlock } from '../src/game/GameState';
+import { BASE_PURITY, addBatch, oreCount } from '../src/game/batches';
+import { isOre } from '../src/game/resources';
 import {
   UNLOCKS,
   buyUnlock,
@@ -12,10 +14,14 @@ import {
   visibleUnlocks,
 } from '../src/game/progression';
 
-/** Hand the starting robot a pile of resources to shop with. */
+/** Hand the starting robot a pile of resources to shop with. Ore goes to batches. */
 function withResources(inventory: Inventory) {
   const state = createInitialState();
-  state.robots[0]!.inventory = { ...inventory };
+  const robot = state.robots[0]!;
+  for (const [id, amount] of Object.entries(inventory)) {
+    if (isOre(id)) addBatch(robot, id, amount ?? 0, BASE_PURITY);
+    else robot.inventory[id as keyof Inventory] = amount;
+  }
   return state;
 }
 
@@ -75,7 +81,7 @@ describe('shop', () => {
     const result = buyUnlock(state, 'trade');
 
     expect(result).toMatchObject({ ok: false, reason: 'missing_resources' });
-    expect(state.robots[0]?.inventory).toEqual({ iron_ore: 5 });
+    expect(oreCount(state.robots[0]!, 'iron_ore')).toBe(5);
     expect(hasUnlock(state, 'trade')).toBe(false);
   });
 
@@ -84,7 +90,7 @@ describe('shop', () => {
 
     expect(buyUnlock(state, 'trade').ok).toBe(true);
 
-    expect(state.robots[0]?.inventory['iron_ore'] ?? 0).toBe(0);
+    expect(oreCount(state.robots[0]!, 'iron_ore')).toBe(0);
     expect(unlockedCommands(state)).toContain('trade');
     expect(isPurchasable(state, 'trade')).toBe(false);
   });

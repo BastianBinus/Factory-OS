@@ -1,15 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState, Inventory } from '../src/game/types';
 import { createInitialState, createRobot } from '../src/game/GameState';
+import { BASE_PURITY, addBatch, oreCount } from '../src/game/batches';
 import { canAfford, missingResources, spendResources, totalResources } from '../src/game/economy';
+import { isOre } from '../src/game/resources';
 
-/** A state whose fleet carries exactly the given inventories, one robot each. */
+/**
+ * A state whose fleet carries exactly the given inventories, one robot each.
+ * Ore is routed into batches (at the neutral purity) since that is where it lives.
+ */
 function fleet(...inventories: Inventory[]): GameState {
   const state = createInitialState();
-  state.robots = inventories.map((inventory, index) => ({
-    ...createRobot(`r${index + 1}`, index, 0),
-    inventory: { ...inventory },
-  }));
+  state.robots = inventories.map((inventory, index) => {
+    const robot = createRobot(`r${index + 1}`, index, 0);
+    for (const [id, amount] of Object.entries(inventory)) {
+      if (isOre(id)) addBatch(robot, id, amount ?? 0, BASE_PURITY);
+      else robot.inventory[id as keyof Inventory] = amount;
+    }
+    return robot;
+  });
   return state;
 }
 
@@ -41,8 +50,8 @@ describe('spendResources', () => {
     expect(spendResources(state, { iron_ore: 6 })).toBe(true);
     expect(totalResources(state)).toEqual({ iron_ore: 2 });
     // The first robot is drained before the second is touched.
-    expect(state.robots[0]?.inventory['iron_ore'] ?? 0).toBe(0);
-    expect(state.robots[1]?.inventory['iron_ore']).toBe(2);
+    expect(oreCount(state.robots[0]!, 'iron_ore')).toBe(0);
+    expect(oreCount(state.robots[1]!, 'iron_ore')).toBe(2);
   });
 
   it('refuses when the fleet is short and touches nothing', () => {

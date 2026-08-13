@@ -1,4 +1,4 @@
-import type { Inventory, ResourceDef, ResourceId } from './types';
+import type { Inventory, OreId, ResourceDef, ResourceId } from './types';
 
 export const RESOURCES: Record<ResourceId, ResourceDef> = {
   iron_ore: { id: 'iron_ore', label: 'Iron ore', colorToken: 'w-ore-iron' },
@@ -7,12 +7,21 @@ export const RESOURCES: Record<ResourceId, ResourceDef> = {
   copper_ingot: { id: 'copper_ingot', label: 'Copper ingot', colorToken: 'w-ingot-copper' },
   gear: { id: 'gear', label: 'Gear', colorToken: 'w-gear' },
   seed_crystal: { id: 'seed_crystal', label: 'Seed crystal', colorToken: 'w-seed-crystal' },
+  refined_ingot: { id: 'refined_ingot', label: 'Refined ingot', colorToken: 'w-metal' },
+  component: { id: 'component', label: 'Component', colorToken: 'w-gear' },
 };
 
 export const RESOURCE_IDS = Object.keys(RESOURCES) as ResourceId[];
 
+/** The raw ores, carried as purity-bearing batches rather than bare counts. */
+export const ORE_IDS: OreId[] = ['iron_ore', 'copper_ore'];
+
 export function isResourceId(value: unknown): value is ResourceId {
   return typeof value === 'string' && value in RESOURCES;
+}
+
+export function isOre(value: unknown): value is OreId {
+  return value === 'iron_ore' || value === 'copper_ore';
 }
 
 export function countOf(inventory: Inventory, resource: ResourceId): number {

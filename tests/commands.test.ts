@@ -1,13 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { clear, craft, drop, mine, move, scan, scanAt, seed, take, trade } from '../src/engine/commands';
+import type { GroundTile } from '../src/game/types';
+import {
+  clear,
+  craft,
+  drop,
+  load,
+  mine,
+  move,
+  press,
+  refine,
+  scan,
+  scanAt,
+  seed,
+  swapSlots,
+  take,
+  trade,
+} from '../src/engine/commands';
+import { setTile } from '../src/game/grid';
 import { BASE_YIELD, purityFor } from '../src/game/cultivation';
 import {
   ctxOf,
   expectFail,
   expectOk,
+  giveOre,
   groundAt,
   idle,
   machineAt,
+  oreCarried,
   robotOf,
   runTick,
   stateFromLayout,
@@ -62,7 +81,9 @@ describe('mine', () => {
 
     expectOk(runTick(state, mine));
 
-    expect(robotOf(state).inventory).toEqual({ iron_ore: BASE_YIELD, seed_crystal: 1 });
+    // Ore lands in the batches; only the crystal is a plain count.
+    expect(robotOf(state).inventory).toEqual({ seed_crystal: 1 });
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(BASE_YIELD);
     expect(groundAt(state, 2, 0).state).toBe('raw');
     expect(state.stats.oreMined).toBe(BASE_YIELD);
   });
@@ -84,29 +105,34 @@ describe('mine', () => {
     expectOk(runTick(state, mine));
 
     // Two harvests of iron; the crystal from the first one paid for the seeding.
-    expect(robotOf(state).inventory).toEqual({ iron_ore: BASE_YIELD * 2, seed_crystal: 1 });
+    expect(robotOf(state).inventory).toEqual({ seed_crystal: 1 });
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(BASE_YIELD * 2);
   });
 });
 
 describe('drop', () => {
   it('loads everything the machine can use', () => {
     const state = stateFromLayout(LAYOUT, 2, 1);
-    robotOf(state).inventory = { iron_ore: 3, copper_ore: 1 };
+    giveOre(robotOf(state), 'iron_ore', 3);
+    giveOre(robotOf(state), 'copper_ore', 1);
 
     expectOk(runTick(state, drop));
 
     expect(machineAt(state, 2, 1).input).toEqual({ iron_ore: 3, copper_ore: 1 });
     expect(robotOf(state).inventory).toEqual({});
+    expect(robotOf(state).batches).toEqual([]);
   });
 
   it('keeps what the machine cannot use', () => {
     const state = stateFromLayout(LAYOUT, 2, 2);
-    robotOf(state).inventory = { iron_ingot: 2, iron_ore: 4 };
+    robotOf(state).inventory = { iron_ingot: 2 };
+    giveOre(robotOf(state), 'iron_ore', 4);
 
     expectOk(runTick(state, drop));
 
     expect(machineAt(state, 2, 2).input).toEqual({ iron_ingot: 2 });
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 4 });
+    expect(robotOf(state).inventory).toEqual({});
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(4);
   });
 
   it('explains when nothing fits', () => {
@@ -200,18 +226,19 @@ describe('craft and take', () => {
 describe('trade', () => {
   it('swaps three of one ore for one of another on the market', () => {
     const state = stateFromLayout(LAYOUT, 0, 0);
-    robotOf(state).inventory = { iron_ore: 7 };
+    giveOre(robotOf(state), 'iron_ore', 7);
 
     const result = expectOk(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore')));
 
     // Seven ore trade in whole threes: two copper out, six iron gone, one left.
     expect(result.value).toBe(2);
-    expect(robotOf(state).inventory).toEqual({ iron_ore: 1, copper_ore: 2 });
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(1);
+    expect(oreCarried(robotOf(state), 'copper_ore')).toBe(2);
   });
 
   it('only works on the market', () => {
     const state = stateFromLayout(LAYOUT, 1, 1);
-    robotOf(state).inventory = { iron_ore: 3 };
+    giveOre(robotOf(state), 'iron_ore', 3);
     expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore'))).code).toBe(
       'nothing_here',
     );
@@ -219,7 +246,7 @@ describe('trade', () => {
 
   it('needs at least three of the input', () => {
     const state = stateFromLayout(LAYOUT, 0, 0);
-    robotOf(state).inventory = { iron_ore: 2 };
+    giveOre(robotOf(state), 'iron_ore', 2);
     expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'copper_ore'))).code).toBe(
       'missing_input',
     );
@@ -227,10 +254,98 @@ describe('trade', () => {
 
   it('refuses to trade a resource for itself', () => {
     const state = stateFromLayout(LAYOUT, 0, 0);
-    robotOf(state).inventory = { iron_ore: 9 };
+    giveOre(robotOf(state), 'iron_ore', 9);
     expect(expectFail(runTick(state, (ctx) => trade(ctx, 'iron_ore', 'iron_ore'))).code).toBe(
       'bad_argument',
     );
+  });
+});
+
+describe('refine', () => {
+  function ripeIron(purity: number): GroundTile {
+    return { kind: 'ground', state: 'ripe', resource: 'iron_ore', ripeAt: null, yield: 3, purity };
+  }
+
+  it('accepts the purest batch and yields a refined ingot', () => {
+    // Robot stands on the refinery; nothing riper is on this bare floor.
+    const state = stateFromLayout(['R.', '..'], 0, 0);
+    giveOre(robotOf(state), 'iron_ore', 3, 9);
+
+    const result = expectOk(runTick(state, refine));
+
+    expect(result.value).toBe(3);
+    expect(robotOf(state).inventory).toEqual({ refined_ingot: 3 });
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(0);
+  });
+
+  it('rejects and destroys a batch when a purer crop is still on the floor', () => {
+    const state = stateFromLayout(['R.', '..'], 0, 0);
+    setTile(state.grid, 1, 0, ripeIron(8)); // a better crop the robot ignored
+    giveOre(robotOf(state), 'iron_ore', 3, 4);
+
+    expect(expectFail(runTick(state, refine)).code).toBe('blocked');
+    // The fed batch is gone; nothing was refined.
+    expect(oreCarried(robotOf(state), 'iron_ore')).toBe(0);
+    expect(robotOf(state).inventory['refined_ingot'] ?? 0).toBe(0);
+  });
+
+  it('needs ore to refine', () => {
+    const state = stateFromLayout(['R.', '..'], 0, 0);
+    expect(expectFail(runTick(state, refine)).code).toBe('inventory_empty');
+  });
+
+  it('only works on the refinery', () => {
+    const state = stateFromLayout(['..'], 0, 0);
+    giveOre(robotOf(state), 'iron_ore', 3, 5);
+    expect(expectFail(runTick(state, refine)).code).toBe('nothing_here');
+  });
+});
+
+describe('press', () => {
+  it('refuses to fire when the loaded slots are out of order', () => {
+    const state = stateFromLayout(['P.', '..'], 0, 0); // robot on the press
+    giveOre(robotOf(state), 'iron_ore', 1, 5);
+    giveOre(robotOf(state), 'iron_ore', 1, 2);
+    expectOk(runTick(state, load));
+    expectOk(runTick(state, load)); // slots: [5, 2, ...] — descending
+
+    expect(expectFail(runTick(state, press)).code).toBe('blocked');
+  });
+
+  it('fires once a reference bubble sort has ordered the slots', () => {
+    const state = stateFromLayout(['P.', '..'], 0, 0);
+    for (const purity of [5, 2, 8, 4]) giveOre(robotOf(state), 'iron_ore', 1, purity);
+    for (let k = 0; k < 4; k += 1) expectOk(runTick(state, load));
+
+    // A plain bubble sort over the slots, using scan to read and swapSlots to fix.
+    const slots = machineAt(state, 0, 0).slots ?? [];
+    for (let pass = 0; pass < slots.length; pass += 1) {
+      for (let i = 0; i < slots.length - 1; i += 1) {
+        const here = slots[i];
+        const next = slots[i + 1];
+        if (next && (!here || here.purity > next.purity)) {
+          expectOk(runTick(state, (ctx) => swapSlots(ctx, i, i + 1)));
+        }
+      }
+    }
+
+    const result = expectOk(runTick(state, press));
+    expect(result.value).toBe(4);
+    expect(robotOf(state).inventory['component']).toBe(4);
+    // Every slot is cleared once it fires.
+    expect(machineAt(state, 0, 0).slots?.every((slot) => slot === null)).toBe(true);
+  });
+
+  it('needs at least two loaded slots to fire', () => {
+    const state = stateFromLayout(['P.', '..'], 0, 0);
+    giveOre(robotOf(state), 'iron_ore', 1, 5);
+    expectOk(runTick(state, load));
+    expect(expectFail(runTick(state, press)).code).toBe('missing_input');
+  });
+
+  it('rejects a slot index out of range', () => {
+    const state = stateFromLayout(['P.', '..'], 0, 0);
+    expect(expectFail(runTick(state, (ctx) => swapSlots(ctx, 0, 99))).code).toBe('bad_argument');
   });
 });
 

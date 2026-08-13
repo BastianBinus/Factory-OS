@@ -11,6 +11,7 @@ import {
 } from '../src/game/cultivation';
 import { setTile } from '../src/game/grid';
 import { createInitialState } from '../src/game/GameState';
+import { oreCount } from '../src/game/batches';
 import { clear, mine, scan, seed } from '../src/engine/commands';
 import { ctxOf, expectFail, expectOk, idle, runTick, stateFromLayout } from './helpers';
 
@@ -291,7 +292,8 @@ describe('mine on cultivated ground', () => {
     const result = expectOk(runTick(state, mine));
 
     expect(result.value).toBe('iron_ore');
-    expect(state.robots[0]!.inventory).toEqual({ iron_ore: 3, seed_crystal: 1 });
+    expect(state.robots[0]!.inventory).toEqual({ seed_crystal: 1 });
+    expect(oreCount(state.robots[0]!, 'iron_ore')).toBe(3);
     expect(state.stats.oreMined).toBe(3);
   });
 
@@ -300,7 +302,8 @@ describe('mine on cultivated ground', () => {
 
     expectOk(runTick(state, mine));
 
-    expect(state.robots[0]!.inventory).toEqual({ iron_ore: 6, seed_crystal: 1 });
+    expect(state.robots[0]!.inventory).toEqual({ seed_crystal: 1 });
+    expect(oreCount(state.robots[0]!, 'iron_ore')).toBe(6);
   });
 
   /*

@@ -1,8 +1,19 @@
-import type { CommandResult, GameState, GroundTile, MachineTile, Robot } from '../src/game/types';
+import type { CommandResult, GameState, GroundTile, MachineTile, OreId, Robot } from '../src/game/types';
 import { createInitialState, createRobot, gridFromLayout } from '../src/game/GameState';
 import { tileAt } from '../src/game/grid';
+import { BASE_PURITY, addBatch, oreCount } from '../src/game/batches';
 import { advanceWorld, move } from '../src/engine/commands';
 import type { CommandContext } from '../src/engine/commands';
+
+/** Puts ore in the robot's batches, since ore no longer lives in the inventory. */
+export function giveOre(robot: Robot, resource: OreId, amount: number, purity = BASE_PURITY): void {
+  addBatch(robot, resource, amount, purity);
+}
+
+/** How much ore of one kind the robot carries. */
+export function oreCarried(robot: Robot, resource: OreId): number {
+  return oreCount(robot, resource);
+}
 
 /**
  * Test-only scaffolding. Mirrors what TickScheduler will do in Phase 3: a tick

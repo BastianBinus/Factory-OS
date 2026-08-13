@@ -1,6 +1,22 @@
 import type { CommandResult } from '../game/types';
 import type { CommandContext } from './commands';
-import { clear, craft, drop, mine, move, scan, scanAt, seed, take, trade, wait } from './commands';
+import {
+  clear,
+  craft,
+  drop,
+  load,
+  mine,
+  move,
+  press,
+  refine,
+  scan,
+  scanAt,
+  seed,
+  swapSlots,
+  take,
+  trade,
+  wait,
+} from './commands';
 
 /**
  * The one place that maps a command name coming out of a script onto the pure
@@ -19,6 +35,10 @@ const RUNNERS: Record<string, CommandRunner> = {
   drop: (ctx) => drop(ctx),
   craft: (ctx) => craft(ctx),
   take: (ctx) => take(ctx),
+  refine: (ctx) => refine(ctx),
+  load: (ctx) => load(ctx),
+  swapSlots: (ctx, args) => swapSlots(ctx, args[0], args[1]),
+  press: (ctx) => press(ctx),
   trade: (ctx, args) => trade(ctx, args[0], args[1]),
   wait: () => wait(),
   scan: (ctx) => scan(ctx),

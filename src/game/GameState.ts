@@ -1,8 +1,9 @@
 import type { GameState, Grid, GroundTile, ResourceId, Robot, Tile, UnlockId } from './types';
+import { PRESS_SLOTS } from './types';
 import { expandGrid } from './grid';
 import { BASE_YIELD, purityFor } from './cultivation';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export const DEFAULT_TICK_RATE_MS = 400;
 export const DEFAULT_CAPACITY = 10;
@@ -79,9 +80,9 @@ export const INITIAL_LAYOUT = [
   '.I......',
   '........',
   '...SA...',
-  '..D.....',
+  '..D.R...',
   '........',
-  '.I....C.',
+  '.I..P.C.',
   '........',
 ];
 
@@ -95,6 +96,17 @@ function tileFromChar(char: string, x: number, y: number): Tile {
       return { kind: 'machine', machine: 'assembler', input: {}, output: {}, job: null };
     case 'D':
       return { kind: 'machine', machine: 'seeder', input: {}, output: {}, job: null };
+    case 'R':
+      return { kind: 'machine', machine: 'refinery', input: {}, output: {}, job: null };
+    case 'P':
+      return {
+        kind: 'machine',
+        machine: 'press',
+        input: {},
+        output: {},
+        job: null,
+        slots: Array.from({ length: PRESS_SLOTS }, () => null),
+      };
     case 'I':
       return ripeGround('iron_ore', x, y);
     case 'C':
@@ -138,7 +150,7 @@ export function gridFromLayout(layout: string[]): Grid {
 }
 
 export function createRobot(id: string, x: number, y: number): Robot {
-  return { id, x, y, facing: 'south', inventory: {} };
+  return { id, x, y, facing: 'south', inventory: {}, batches: [] };
 }
 
 /**

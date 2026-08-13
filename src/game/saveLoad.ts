@@ -11,6 +11,7 @@ import {
   gridFromLayout,
 } from './GameState';
 import { expandGrid } from './grid';
+import { BASE_PURITY } from './batches';
 import { readString, remove, writeString } from '../utils/storage';
 
 export const SAVE_KEY = 'factoryos.save';
@@ -118,6 +119,29 @@ const MIGRATIONS: Record<number, Migration> = {
    * as the factory runs. Nothing the player earned depends on it.
    */
   3: (data) => ({ ...data, history: [], tickProduced: {}, version: 4 }),
+
+  /**
+   * Batches. Ore leaves the count inventory and becomes purity-bearing parcels.
+   * Any ore a robot was carrying comes back as one batch at the neutral purity —
+   * the tile it came from is long gone, so there is no grade to recover, and
+   * nothing is lost.
+   */
+  4: (data) => {
+    const robots = Array.isArray(data['robots']) ? data['robots'] : [];
+    for (const robot of robots) {
+      if (!isRecord(robot)) continue;
+      const inventory = isRecord(robot['inventory']) ? { ...robot['inventory'] } : {};
+      const batches = Array.isArray(robot['batches']) ? robot['batches'] : [];
+      for (const ore of ['iron_ore', 'copper_ore']) {
+        const amount = typeof inventory[ore] === 'number' ? (inventory[ore] as number) : 0;
+        if (amount > 0) batches.push({ resource: ore, amount, purity: BASE_PURITY });
+        delete inventory[ore];
+      }
+      robot['inventory'] = inventory;
+      robot['batches'] = batches;
+    }
+    return { ...data, robots, version: 5 };
+  },
 };
 
 export function serialize(state: GameState): string {
@@ -230,6 +254,11 @@ function fillGaps(state: Record<string, unknown> & GameState): void {
   // written before instrumentation, harmless to start empty.
   if (!Array.isArray(state['history'])) state.history = [];
   if (!isRecord(state['tickProduced'])) state.tickProduced = {};
+
+  // Every robot carries an ore-batch list; a save from before batches has none.
+  for (const robot of state.robots) {
+    if (!Array.isArray(robot.batches)) robot.batches = [];
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

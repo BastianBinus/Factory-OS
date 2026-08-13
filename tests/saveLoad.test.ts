@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ONBOARDING_DONE, SAVE_VERSION, createInitialState, hasUnlock } from '../src/game/GameState';
 import { deserialize, serialize } from '../src/game/saveLoad';
+import { oreCount } from '../src/game/batches';
 import { buyUnlock, unlockedCommands } from '../src/game/progression';
 
 function savedState(): Record<string, unknown> {
@@ -143,10 +144,12 @@ describe('migration', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // 777 credits at the old price of three come back as 259 iron ore.
-    expect(result.state.robots[0]?.inventory['iron_ore']).toBe(259);
+    // 777 credits at the old price of three come back as 259 iron ore — now a
+    // batch, since the v4→v5 migration moved ore out of the count inventory.
+    expect(oreCount(result.state.robots[0]!, 'iron_ore')).toBe(259);
+    expect(result.state.robots[0]?.inventory['iron_ore']).toBeUndefined();
     expect(result.state.inventoryCapacity).toBe(20);
-    // Migrated through to v4: the throughput ring buffer starts empty.
+    // Migrated all the way through: the throughput ring buffer starts empty.
     expect(result.state.history).toEqual([]);
   });
 });
@@ -222,9 +225,9 @@ describe('the cultivation and currency migrations', () => {
     expect(grid.tiles).toHaveLength(144);
     expect(grid.tiles.map((tile) => tile.kind)).not.toContain('ore');
 
-    // The floor has to come back whole: three machines, a market, and something
+    // The floor has to come back whole: the machines, a market, and something
     // ripe to harvest. A grid of bare raw ground would be a save nobody can play.
-    expect(grid.tiles.filter((tile) => tile.kind === 'machine')).toHaveLength(3);
+    expect(grid.tiles.filter((tile) => tile.kind === 'machine')).toHaveLength(5);
     expect(grid.tiles.filter((tile) => tile.kind === 'market')).toHaveLength(1);
     expect(
       grid.tiles.filter((tile) => tile.kind === 'ground' && tile.state === 'ripe'),
@@ -259,8 +262,8 @@ describe('the cultivation and currency migrations', () => {
     if (!result.ok) return;
     const loaded = result.state;
 
-    // 4200 / 3 = 1400 iron ore, handed to the first robot.
-    expect(loaded.robots[0]?.inventory['iron_ore']).toBe(1400);
+    // 4200 / 3 = 1400 iron ore, handed to the first robot as a batch.
+    expect(oreCount(loaded.robots[0]!, 'iron_ore')).toBe(1400);
     // sell() no longer exists; the rest of the unlocks survive.
     expect(loaded.unlocks).toEqual(['move', 'mine', 'print']);
     // Missions and their bookkeeping are gone; the crafting tally stays.
@@ -290,5 +293,27 @@ describe('the cultivation and currency migrations', () => {
     expect(result.migratedFrom).toBe(3);
     expect(result.state.history).toEqual([]);
     expect(result.state.tickProduced).toEqual({});
+  });
+
+  it('moves a v4 save’s carried ore into batches at the neutral purity', () => {
+    const data = savedState();
+    data['version'] = 4;
+    // A v4 robot kept ore as a plain count; give it some, plus a non-ore item.
+    (data['robots'] as Record<string, unknown>[])[0]!['inventory'] = {
+      iron_ore: 5,
+      seed_crystal: 2,
+    };
+    delete (data['robots'] as Record<string, unknown>[])[0]!['batches'];
+
+    const result = deserialize(JSON.stringify(data));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const robot = result.state.robots[0]!;
+    expect(result.migratedFrom).toBe(4);
+    expect(oreCount(robot, 'iron_ore')).toBe(5);
+    expect(robot.batches).toEqual([{ resource: 'iron_ore', amount: 5, purity: 5 }]);
+    // The ore is gone from the count inventory; the crystal stays.
+    expect(robot.inventory).toEqual({ seed_crystal: 2 });
   });
 });

@@ -17,6 +17,7 @@ const STAGE_LABEL: Record<StageId, string> = {
   mine: 'Mining',
   smelt: 'Smelting',
   assemble: 'Assembly',
+  press: 'Pressing',
 };
 
 export interface RatesPanelOptions {

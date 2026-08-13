@@ -12,12 +12,34 @@ export type ResourceId =
   | 'iron_ingot'
   | 'copper_ingot'
   | 'gear'
-  | 'seed_crystal';
+  | 'seed_crystal'
+  | 'refined_ingot'
+  | 'component';
 
-export type MachineId = 'smelter' | 'assembler' | 'seeder';
+/** The raw ores. These are the only resources carried as purity-bearing batches. */
+export type OreId = 'iron_ore' | 'copper_ore';
+
+export type MachineId = 'smelter' | 'assembler' | 'seeder' | 'refinery' | 'press';
+
+/** How many slots the sorting press has. */
+export const PRESS_SLOTS = 8;
 
 /** Sparse on purpose: a missing key means zero. Use the helpers in resources.ts. */
 export type Inventory = Partial<Record<ResourceId, number>>;
+
+/**
+ * A parcel of ore stamped with the purity of the tile it was mined from.
+ *
+ * Ore is the one thing carried as batches rather than a bare count, because the
+ * refinery and the press judge it by purity — a count would throw that away the
+ * moment the ore left the ground.
+ */
+export interface Batch {
+  resource: OreId;
+  amount: number;
+  /** 1..10, inherited from the ground tile at mine time. */
+  purity: number;
+}
 
 export type GroundState = 'raw' | 'prepared' | 'growing' | 'ripe';
 
@@ -53,6 +75,8 @@ export interface MachineTile {
   input: Inventory;
   output: Inventory;
   job: MachineJob | null;
+  /** The press's ordered slots. `null` on every other machine. */
+  slots?: (Batch | null)[];
 }
 
 export interface MarketTile {
@@ -66,7 +90,10 @@ export interface Robot {
   x: number;
   y: number;
   facing: Direction;
+  /** Everything but raw ore: ingots, gears, crystals. Ore lives in `batches`. */
   inventory: Inventory;
+  /** Raw ore the robot carries, each parcel keeping the purity it was mined at. */
+  batches: Batch[];
 }
 
 export interface Grid {
@@ -110,7 +137,9 @@ export type UnlockId =
   | 'tick_300'
   | 'tick_200'
   | 'tick_120'
-  | 'robot_2';
+  | 'robot_2'
+  | 'calibration'
+  | 'sorting';
 
 export type ConceptId =
   | 'await'
@@ -120,6 +149,7 @@ export type ConceptId =
   | 'arrays'
   | 'objects'
   | 'for_of'
+  | 'sorting'
   // Reached by switching the cloud on rather than by playing.
   | 'promises'
   | 'fetch'
@@ -155,7 +185,7 @@ export interface Stats {
 }
 
 /** The production steps the throughput meter counts, in flow order. */
-export type StageId = 'seed' | 'mine' | 'smelt' | 'assemble';
+export type StageId = 'seed' | 'mine' | 'smelt' | 'assemble' | 'press';
 
 /** What one tick produced, per stage. The unit the ring buffer is made of. */
 export interface RateSample {

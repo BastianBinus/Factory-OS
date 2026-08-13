@@ -154,12 +154,32 @@ export interface Stats {
   crafted: Inventory;
 }
 
+/** The production steps the throughput meter counts, in flow order. */
+export type StageId = 'seed' | 'mine' | 'smelt' | 'assemble';
+
+/** What one tick produced, per stage. The unit the ring buffer is made of. */
+export interface RateSample {
+  tick: number;
+  produced: Partial<Record<StageId, number>>;
+}
+
 export interface GameState {
   version: number;
   tick: number;
   grid: Grid;
   robots: Robot[];
   unlocks: UnlockId[];
+  /**
+   * One RateSample per tick, newest last, capped at a fixed length. The throughput
+   * meter and the bottleneck graph read their whole window out of this.
+   */
+  history: RateSample[];
+  /**
+   * What the current tick has produced so far, filled by the production sites as
+   * they run and drained into `history` when the tick closes. Transient: it is
+   * always empty at rest, which is why a save never carries anything in it.
+   */
+  tickProduced: Partial<Record<StageId, number>>;
   /**
    * Concept ids already shown to the player. Deliberately loose strings: a save
    * from an older build may name a concept this one no longer has, and that is

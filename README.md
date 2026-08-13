@@ -245,7 +245,7 @@ Vite · TypeScript (strict) · Three.js · CodeMirror 6 · Vitest · Supabase (f
 | 10a | Cultivation core: clear, seed, grow, mine — nothing regrows free | done |
 | 10b | Resources become the currency; credits and the mission chain removed | done |
 | 10c | Throughput meter and bottleneck graphs (absorbs 9c) | done |
-| 10d | Calibration and sorting bay — the first mandatory algorithms | designed |
+| 10d | Calibration and sorting bay — the first mandatory algorithms | done |
 | 10e | Foundry pour and pipe routing | designed |
 | 10f | Conveyor belts (absorbs 9b) | designed |
 | 9d | Script library with real modules | planned |

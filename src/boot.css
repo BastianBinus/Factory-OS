@@ -372,6 +372,55 @@
   overflow: hidden;
 }
 
+.codepanel__tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3) 0;
+  overflow-x: auto;
+}
+
+.codepanel__tabs[hidden] {
+  display: none;
+}
+
+.codepanel__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.codepanel__tab--active {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.codepanel__tab--add {
+  color: var(--text-faint);
+  font-size: 14px;
+}
+
+.codepanel__tab-x {
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.codepanel__tab-x:hover {
+  color: var(--text);
+}
+
 /* Shop and mission drawers -------------------------------------------------- */
 
 /*

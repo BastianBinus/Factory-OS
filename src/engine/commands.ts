@@ -8,11 +8,12 @@ import type {
   Inventory,
   MachineTile,
   OreId,
+  ResourceId,
   Robot,
   Tile,
 } from '../game/types';
 import { PRESS_SLOTS } from '../game/types';
-import { inBounds, isDirection, step, tileAt } from '../game/grid';
+import { inBounds, isDirection, setTile, step, tileAt } from '../game/grid';
 import {
   RESOURCES,
   RESOURCE_IDS,
@@ -84,6 +85,9 @@ export function move(ctx: CommandContext, direction: unknown): CommandResult {
 
   if (!inBounds(ctx.state.grid, target.x, target.y)) {
     return fail('blocked', `The robot cannot move ${direction} — that is the edge of the factory.`);
+  }
+  if (tileAt(ctx.state.grid, target.x, target.y)?.kind === 'wall') {
+    return fail('blocked', `A wall blocks the way ${direction}. The robot has to route around it.`);
   }
 
   ctx.robot.x = target.x;
@@ -428,6 +432,70 @@ export function press(ctx: CommandContext): CommandResult {
   return ok(made, `pressed ${made} sorted slots into ${made} components`);
 }
 
+/**
+ * The foundry pour. It casts an alloy only when every smelter around it is hot —
+ * has finished a batch and is holding output — in the same tick, and there are at
+ * least `order.need` of them. One cold smelter fails the pour and, because a
+ * half-poured cast is scrap, empties every neighbouring smelter with it. So the
+ * player has to fire the whole ring and time the pour: whole-floor simultaneity.
+ */
+export function pour(ctx: CommandContext): CommandResult {
+  const tile = currentTile(ctx);
+  if (!tile || tile.kind !== 'machine' || tile.machine !== 'foundry') {
+    return fail('nothing_here', 'The robot has to stand on the foundry to pour.');
+  }
+
+  const smelters: { tile: MachineTile; x: number; y: number }[] = [];
+  for (const direction of ['north', 'east', 'south', 'west'] as const) {
+    const at = step(ctx.robot.x, ctx.robot.y, direction);
+    const neighbour = tileAt(ctx.state.grid, at.x, at.y);
+    if (neighbour?.kind === 'machine' && neighbour.machine === 'smelter') {
+      smelters.push({ tile: neighbour, x: at.x, y: at.y });
+    }
+  }
+
+  const need = tile.order?.need ?? smelters.length;
+  if (smelters.length < need) {
+    return fail('missing_input', `The foundry needs ${need} smelters around it; it has ${smelters.length}.`);
+  }
+
+  const cold = smelters.find((entry) => isEmpty(entry.tile.output));
+  if (cold) {
+    // A failed pour is scrap: every smelter around it is emptied.
+    for (const entry of smelters) entry.tile.output = {};
+    return fail(
+      'blocked',
+      `The smelter at ${cold.x},${cold.y} was cold, so the pour failed and the cast was scrapped.`,
+    );
+  }
+
+  // Every smelter is hot: consume one ingot from each and cast one alloy per smelter.
+  for (const entry of smelters) {
+    for (const id of RESOURCE_IDS) {
+      if ((entry.tile.output[id] ?? 0) > 0) {
+        removeItems(entry.tile.output, id, 1);
+        break;
+      }
+    }
+  }
+
+  const cast = smelters.length;
+  addItems(ctx.robot.inventory, 'alloy', cast);
+  return ok(cast, `poured ${cast} alloy from ${cast} hot smelters`);
+}
+
+export function belt(ctx: CommandContext, direction: unknown): CommandResult {
+  if (!isDirection(direction)) {
+    return fail('bad_argument', `belt() needs a direction — got ${JSON.stringify(direction)}.`);
+  }
+  const tile = currentTile(ctx);
+  if (!tile || tile.kind !== 'ground' || tile.state !== 'raw') {
+    return fail('nothing_here', 'A belt can only be laid on open, raw ground.');
+  }
+  setTile(ctx.state.grid, ctx.robot.x, ctx.robot.y, { kind: 'belt', direction, item: null });
+  return ok(direction, `laid a belt running ${direction}`);
+}
+
 /** How many of `from` buy one of `to` at the market. */
 export const TRADE_RATIO = 3;
 
@@ -535,9 +603,15 @@ export function describeTile(state: GameState, x: number, y: number): unknown {
         ...(tile.slots
           ? { slots: tile.slots.map((slot) => (slot === null ? null : slot.purity)) }
           : {}),
+        // The foundry exposes its order — how many hot smelters a pour needs.
+        ...(tile.order ? { order: { ...tile.order } } : {}),
       };
     case 'market':
       return { type: 'market', x, y };
+    case 'wall':
+      return { type: 'wall', x, y };
+    case 'belt':
+      return { type: 'belt', x, y, direction: tile.direction, item: tile.item };
     default:
       return { type: 'unknown', x, y };
   }
@@ -562,5 +636,78 @@ export function advanceWorld(state: GameState): void {
     tile.job = null;
   }
 
+  advanceBelts(state);
   ripen(state);
+}
+
+const OPPOSITE: Record<Direction, Direction> = {
+  north: 'south',
+  east: 'west',
+  south: 'north',
+  west: 'east',
+};
+
+/**
+ * Moves every belt's item one step and pulls fresh output onto empty belts — the
+ * one part of the world that carries material without a robot.
+ *
+ * Two passes over a fixed row-major order keep it deterministic. First items
+ * advance, but a tile that just received one is marked so the same item cannot
+ * leapfrog further this tick; a belt hands its item to the next empty belt, or
+ * into a machine that accepts it, or holds it if neither. Then every empty belt
+ * pulls one item off a machine sitting directly behind it.
+ */
+function advanceBelts(state: GameState): void {
+  const grid = state.grid;
+  const filledThisTick = new Set<number>();
+
+  for (let y = 0; y < grid.height; y += 1) {
+    for (let x = 0; x < grid.width; x += 1) {
+      const tile = tileAt(grid, x, y);
+      if (tile?.kind !== 'belt' || tile.item === null) continue;
+      const here = indexOfXY(grid, x, y);
+      if (filledThisTick.has(here)) continue;
+
+      const ahead = step(x, y, tile.direction);
+      const target = tileAt(grid, ahead.x, ahead.y);
+
+      if (target?.kind === 'belt' && target.item === null) {
+        target.item = tile.item;
+        tile.item = null;
+        filledThisTick.add(indexOfXY(grid, ahead.x, ahead.y));
+      } else if (target?.kind === 'machine' && machineAccepts(target, tile.item)) {
+        addItems(target.input, tile.item, 1);
+        tile.item = null;
+      }
+      // else: the way is blocked, the item waits.
+    }
+  }
+
+  // Loading: an empty belt pulls one item off a machine directly behind it.
+  for (let y = 0; y < grid.height; y += 1) {
+    for (let x = 0; x < grid.width; x += 1) {
+      const tile = tileAt(grid, x, y);
+      if (tile?.kind !== 'belt' || tile.item !== null) continue;
+      const behind = step(x, y, OPPOSITE[tile.direction]);
+      const source = tileAt(grid, behind.x, behind.y);
+      if (source?.kind !== 'machine') continue;
+      for (const id of RESOURCE_IDS) {
+        if ((source.output[id] ?? 0) > 0) {
+          removeItems(source.output, id, 1);
+          tile.item = id;
+          break;
+        }
+      }
+    }
+  }
+}
+
+/** Grid index for (x, y). Local to the belt sim so it needs no extra import. */
+function indexOfXY(grid: GameState['grid'], x: number, y: number): number {
+  return y * grid.width + x;
+}
+
+/** True when the machine has a recipe that consumes `id` — what drop/belts feed. */
+function machineAccepts(tile: MachineTile, id: ResourceId): boolean {
+  return acceptedInputs(tile).has(id);
 }

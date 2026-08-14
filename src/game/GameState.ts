@@ -77,9 +77,9 @@ export const STARTER_SCRIPT = `// This is your script. It drives the robot in th
  */
 export const INITIAL_LAYOUT = [
   'M.......',
-  '.I......',
-  '........',
-  '...SA...',
+  '.I....S.',
+  '......F.',
+  '...SA.S.',
   '..D.R...',
   '........',
   '.I..P.C.',
@@ -98,6 +98,15 @@ function tileFromChar(char: string, x: number, y: number): Tile {
       return { kind: 'machine', machine: 'seeder', input: {}, output: {}, job: null };
     case 'R':
       return { kind: 'machine', machine: 'refinery', input: {}, output: {}, job: null };
+    case 'F':
+      return {
+        kind: 'machine',
+        machine: 'foundry',
+        input: {},
+        output: {},
+        job: null,
+        order: { need: 2 },
+      };
     case 'P':
       return {
         kind: 'machine',

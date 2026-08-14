@@ -53,6 +53,14 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
     detail: 'await press()',
     info: 'Fire the press. It only works when the loaded slots climb by purity.',
   },
+  pour: {
+    detail: 'await pour()',
+    info: 'Cast alloy at the foundry. Every smelter around it must be hot in the same tick.',
+  },
+  belt: {
+    detail: "await belt('east')",
+    info: 'Lay a conveyor belt on raw ground. It carries machine output along, no robot needed.',
+  },
   trade: {
     detail: "await trade('iron_ore', 'copper_ore')",
     info: 'Swap three of one ore for one of another. Market tile only.',
@@ -63,6 +71,7 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
   print: { detail: 'print(value)', info: 'Write a value into the console. Costs no tick.' },
   position: { detail: 'position()', info: 'The robot position as {x, y}. Costs no tick.' },
   inventory: { detail: 'inventory()', info: 'What the robot carries. Costs no tick.' },
+  worldSize: { detail: 'worldSize()', info: 'The factory bounds as {width, height}. Costs no tick.' },
   me: {
     detail: 'me()',
     info: 'Which robot is running this copy of the script, as {id, index}. Costs no tick.',

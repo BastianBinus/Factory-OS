@@ -21,10 +21,12 @@ import type { GroundView, MachineView } from './meshFactory';
 import {
   WorldGeometry,
   WorldMaterials,
+  createBelt,
   createGround,
   createMachine,
   createMarket,
   createRobot,
+  createWall,
 } from './meshFactory';
 import type { Scene } from './Scene';
 
@@ -206,6 +208,10 @@ export class WorldView {
       }
       case 'market':
         return { group: createMarket(this.geometry, this.materials) };
+      case 'wall':
+        return { group: createWall(this.geometry, this.materials) };
+      case 'belt':
+        return { group: createBelt(this.geometry, this.materials, tile.direction) };
       default:
         return null;
     }
@@ -446,6 +452,7 @@ const MACHINE_MARK: Record<MachineId, string> = {
   seeder: 'd',
   refinery: 'r',
   press: 'p',
+  foundry: 'f',
 };
 
 /**
@@ -463,7 +470,12 @@ export function gridSignature(grid: Grid): string {
     .map((tile) => {
       if (tile.kind === 'ground') return '.';
       if (tile.kind === 'machine') return MACHINE_MARK[tile.machine];
-      return tile.kind === 'market' ? 'm' : '.';
+      if (tile.kind === 'market') return 'm';
+      if (tile.kind === 'wall') return 'w';
+      // Direction is part of the signature so laying or turning a belt rebuilds it;
+      // the moving item is handled live in syncTiles, not here.
+      if (tile.kind === 'belt') return `b${tile.direction[0]}`;
+      return '.';
     })
     .join('');
   return `${grid.width}x${grid.height}:${kinds}`;

@@ -64,6 +64,8 @@ function snapshotFor(robotId: string, index: number): StateSnapshot {
     facing: 'south',
     inventory: {},
     tick: 0,
+    width: 8,
+    height: 8,
   };
 }
 

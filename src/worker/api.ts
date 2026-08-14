@@ -36,7 +36,7 @@ export class ApiError extends Error {
 }
 
 /** Readers and `print` never reach the tick loop, everything else does. */
-const INSTANT = new Set(['print', 'position', 'inventory', 'me']);
+const INSTANT = new Set(['print', 'position', 'inventory', 'me', 'worldSize']);
 
 const MAX_WAIT_TICKS = 1000;
 
@@ -135,6 +135,13 @@ export function createApi(commands: readonly string[], host: ApiHost): Record<st
     api['me'] = (): { id: string; index: number } => {
       const snapshot = host.snapshot();
       return { id: snapshot.robotId, index: snapshot.index };
+    };
+  }
+
+  if (commands.includes('worldSize')) {
+    api['worldSize'] = (): { width: number; height: number } => {
+      const snapshot = host.snapshot();
+      return { width: snapshot.width, height: snapshot.height };
     };
   }
 

@@ -316,4 +316,33 @@ describe('the cultivation and currency migrations', () => {
     // The ore is gone from the count inventory; the crystal stays.
     expect(robot.inventory).toEqual({ seed_crystal: 2 });
   });
+
+  it('gives a v5 save an empty module library', () => {
+    const data = savedState();
+    data['version'] = 5;
+    delete data['modules'];
+
+    const result = deserialize(JSON.stringify(data));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.migratedFrom).toBe(5);
+    expect(result.state.modules).toEqual([]);
+  });
+});
+
+describe('script modules', () => {
+  it('round-trips a module library untouched', () => {
+    const state = createInitialState();
+    state.modules = [
+      { name: 'pathfinding', source: 'export function bfs() {}' },
+      { name: 'math', source: 'export const tau = 6.28' },
+    ];
+
+    const result = deserialize(serialize(state));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.modules).toEqual(state.modules);
+  });
 });

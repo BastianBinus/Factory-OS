@@ -3,7 +3,7 @@ import { PRESS_SLOTS } from './types';
 import { expandGrid } from './grid';
 import { BASE_YIELD, purityFor } from './cultivation';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export const DEFAULT_TICK_RATE_MS = 400;
 export const DEFAULT_CAPACITY = 10;

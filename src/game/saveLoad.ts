@@ -142,6 +142,13 @@ const MIGRATIONS: Record<number, Migration> = {
     }
     return { ...data, robots, version: 5 };
   },
+
+  /**
+   * Script modules. A save from before them simply has none; the field starts as
+   * an empty list and the player builds their library from there. Purely
+   * additive — nothing they earned is touched.
+   */
+  5: (data) => ({ ...data, modules: [], version: 6 }),
 };
 
 export function serialize(state: GameState): string {
@@ -254,6 +261,9 @@ function fillGaps(state: Record<string, unknown> & GameState): void {
   // written before instrumentation, harmless to start empty.
   if (!Array.isArray(state['history'])) state.history = [];
   if (!isRecord(state['tickProduced'])) state.tickProduced = {};
+
+  // The script-module library: empty in any save from before modules existed.
+  if (!Array.isArray(state['modules'])) state.modules = [];
 
   // Every robot carries an ore-batch list; a save from before batches has none.
   for (const robot of state.robots) {

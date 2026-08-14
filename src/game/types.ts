@@ -4,6 +4,9 @@
  * what makes the rules testable without a browser.
  */
 
+import type { ModuleDoc } from './modules';
+export type { ModuleDoc };
+
 export type Direction = 'north' | 'east' | 'south' | 'west';
 
 export type ResourceId =
@@ -160,7 +163,8 @@ export type UnlockId =
   | 'sorting'
   | 'foundry'
   | 'routing'
-  | 'belts';
+  | 'belts'
+  | 'script_modules';
 
 export type ConceptId =
   | 'await'
@@ -172,6 +176,7 @@ export type ConceptId =
   | 'for_of'
   | 'sorting'
   | 'recursion'
+  | 'modules'
   // Reached by switching the cloud on rather than by playing.
   | 'promises'
   | 'fetch'
@@ -242,6 +247,11 @@ export interface GameState {
   onboardingStep: number;
   stats: Stats;
   script: string;
+  /**
+   * Named helper libraries the main script pulls in with `use('name')`. Ordered,
+   * so the editor's tabs keep their places. Empty until the player unlocks them.
+   */
+  modules: ModuleDoc[];
   /** Milliseconds per tick. Lowered by upgrades, never by a speed slider. */
   tickRateMs: number;
   inventoryCapacity: number;

@@ -82,4 +82,15 @@ describe('createModuleResolver', () => {
     const use = createModuleResolver(modules({ name: 'broken', source: 'export const = ' }));
     expect(() => use('broken')).toThrow(/Module 'broken' has an error/);
   });
+
+  it('blames a runtime throw on the module, once, at its source', () => {
+    const use = createModuleResolver(
+      modules(
+        { name: 'inner', source: "throw new Error('boom')\nexport const x = 1" },
+        { name: 'outer', source: "export const y = use('inner')" },
+      ),
+    );
+    // Named for 'inner', not re-blamed on 'outer' on the way out.
+    expect(() => use('outer')).toThrow(/Module 'inner' failed: boom/);
+  });
 });

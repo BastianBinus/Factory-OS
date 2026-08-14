@@ -202,6 +202,16 @@ export const UNLOCKS: UnlockDef[] = [
     requiresUnlocks: ['routing'],
     commands: ['belt'],
   },
+  {
+    id: 'script_modules',
+    label: 'Script modules',
+    description:
+      "Factor reusable code into named modules and pull it into the main script with use('name'). A module returns what it exports; the editor grows a tab for each one.",
+    cost: { alloy: 20, component: 10 },
+    requiresUnlocks: ['belts'],
+    commands: ['use'],
+    conceptId: 'modules',
+  },
 ];
 
 export function getUnlock(id: UnlockId): UnlockDef | undefined {

@@ -1,5 +1,5 @@
 import type { ScriptRunnerHandlers, StopReason } from './ScriptRunner';
-import type { ActionMessage, StateSnapshot } from '../worker/protocol';
+import type { ActionMessage, ModuleSource, StateSnapshot } from '../worker/protocol';
 
 /**
  * One script runner per robot.
@@ -20,7 +20,7 @@ import type { ActionMessage, StateSnapshot } from '../worker/protocol';
 /** The part of `ScriptRunner` a fleet actually uses. */
 export interface FleetRunner {
   readonly running: boolean;
-  start(source: string, commands: string[], snapshot: StateSnapshot): void;
+  start(source: string, modules: ModuleSource[], commands: string[], snapshot: StateSnapshot): void;
   resolve(id: number, value: unknown, snapshot: StateSnapshot): void;
   reject(id: number, message: string, snapshot: StateSnapshot): void;
   stop(reason?: StopReason): void;
@@ -92,7 +92,7 @@ export class Fleet {
     return [...this.runners.keys()];
   }
 
-  start(members: readonly FleetMember[], source: string, commands: string[]): void {
+  start(members: readonly FleetMember[], source: string, modules: ModuleSource[], commands: string[]): void {
     this.stop('user');
 
     this.worstReason = 'finished';
@@ -106,7 +106,7 @@ export class Fleet {
     }
 
     for (const member of members) {
-      this.runners.get(member.robotId)?.start(source, commands, member.snapshot);
+      this.runners.get(member.robotId)?.start(source, modules, commands, member.snapshot);
     }
   }
 

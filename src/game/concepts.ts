@@ -162,6 +162,37 @@ while (queue.length > 0) {
 }`,
   },
   {
+    id: 'modules',
+    title: 'Modules — a library of your own',
+    body:
+      'Once a helper is worth keeping, it should live in one place instead of being pasted into ' +
+      'every script. A module is a separate file that ends by exporting the pieces other scripts ' +
+      'may use; the main script pulls them in with use(\'name\'), which runs the module once and ' +
+      'hands back exactly what it exported. Keep a module pure — data goes in as arguments, answers ' +
+      'come back as return values — and the same pathfinder serves every robot.',
+    codeExample: `// Module "pathfinding": export the search, keep it pure.
+export function bfs(start, goal, passable) {
+  const seen = new Set([start.join(',')]);
+  const queue = [[start, []]];
+  while (queue.length > 0) {
+    const [at, path] = queue.shift();
+    if (at[0] === goal[0] && at[1] === goal[1]) return path;
+    for (const step of steps(at)) {
+      const key = step.join(',');
+      if (passable(step) && !seen.has(key)) {
+        seen.add(key);
+        queue.push([step, [...path, step]]);
+      }
+    }
+  }
+  return null;
+}
+
+// Main script: bring it in and use it.
+const { bfs } = use('pathfinding');
+const route = bfs(position(), target, tileIsClear);`,
+  },
+  {
     id: 'promises',
     title: 'Promises — the thing await was waiting for',
     body:

@@ -632,7 +632,7 @@ function runScript(): void {
     snapshot: snapshotOf(robot.id),
   }));
 
-  fleet.start(members, codePanel.editor.value, unlockedCommands(state));
+  fleet.start(members, codePanel.editor.value, state.modules, unlockedCommands(state));
   scheduler.setTickRate(state.tickRateMs);
   scheduler.start();
   controls.update({ running: true, paused: false });

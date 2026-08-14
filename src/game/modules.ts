@@ -28,6 +28,18 @@ type SyncFunctionConstructor = new (...args: string[]) => ModuleFn;
 const SyncFunction = Function as unknown as SyncFunctionConstructor;
 
 /**
+ * An error already attributed to a specific module. Carrying the marker means a
+ * failure deep in a chain (`a` uses `b` uses `c`) is named once, at `c`, and
+ * passes back out untouched rather than being re-blamed on every module above it.
+ */
+export class ModuleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ModuleError';
+  }
+}
+
+/**
  * Turns the player's `export`s into a returned object so a plain function body
  * can hand them back. Three shapes are understood, each only at the start of a
  * line: `export function/const/let/var/class NAME`, and `export { a, b as c }`.
@@ -82,18 +94,18 @@ export function createModuleResolver(modules: readonly ModuleDoc[]): (name: stri
 
     const source = sources.get(name);
     if (source === undefined) {
-      throw new Error(`There is no module named '${name}'.`);
+      throw new ModuleError(`There is no module named '${name}'.`);
     }
 
     if (resolving.includes(name)) {
       const loop = [...resolving, name].join(' → ');
-      throw new Error(`Modules use each other in a loop: ${loop}.`);
+      throw new ModuleError(`Modules use each other in a loop: ${loop}.`);
     }
 
     resolving.push(name);
     try {
       const compiled = compile(name, source);
-      const exports = compiled(use);
+      const exports = run(name, compiled, use);
       const result: Exports = exports && typeof exports === 'object' ? exports : {};
       cache.set(name, result);
       return result;
@@ -110,7 +122,20 @@ function compile(name: string, source: string): ModuleFn {
   try {
     return new SyncFunction('use', wrapModuleSource(source));
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Module '${name}' has an error: ${message}`);
+    throw new ModuleError(`Module '${name}' has an error: ${messageOf(error)}`);
   }
+}
+
+/** Runs a module body, blaming a raw throw on this module — but only the first time. */
+function run(name: string, compiled: ModuleFn, use: (name: string) => Exports): Exports {
+  try {
+    return compiled(use);
+  } catch (error) {
+    if (error instanceof ModuleError) throw error;
+    throw new ModuleError(`Module '${name}' failed: ${messageOf(error)}`);
+  }
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

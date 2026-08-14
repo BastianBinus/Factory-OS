@@ -27,11 +27,19 @@ export interface StateSnapshot {
   height: number;
 }
 
+/** A named helper library the main script can pull in with `use('name')`. */
+export interface ModuleSource {
+  name: string;
+  source: string;
+}
+
 export interface RunMessage {
   type: 'run';
   source: string;
   /** Names the player has unlocked. Everything else is absent from the API. */
   commands: string[];
+  /** The player's own modules, resolved on demand when `use` is unlocked. */
+  modules: ModuleSource[];
   snapshot: StateSnapshot;
 }
 

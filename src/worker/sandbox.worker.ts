@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { ApiError, createApi } from './api';
 import type { ApiHost } from './api';
+import { createModuleResolver } from '../game/modules';
 import type { MainToWorker, RunMessage, StateSnapshot, WorkerToMain } from './protocol';
 import { LineOffset, frameLine } from '../engine/lineMapper';
 
@@ -137,8 +138,25 @@ async function calibrate(names: string[], command: string): Promise<void> {
 
 /** A blocking command is needed to probe with; `move` is there from the start. */
 function probeCommand(names: string[]): string | null {
-  const usable = names.filter((name) => !['print', 'position', 'inventory', 'wait'].includes(name));
+  const usable = names.filter(
+    (name) => !['print', 'position', 'inventory', 'wait', 'use'].includes(name),
+  );
   return usable.includes('move') ? 'move' : (usable[0] ?? null);
+}
+
+/**
+ * The `use('name')` a module-enabled script writes against. Not an action —
+ * it runs the player's own module synchronously and returns its exports — so it
+ * is built here from the run message rather than living in the tick API.
+ */
+function buildUse(message: RunMessage): (name: unknown) => Record<string, unknown> {
+  const resolve = createModuleResolver(message.modules);
+  return (name: unknown): Record<string, unknown> => {
+    if (typeof name !== 'string') {
+      throw new Error(`use() needs a module name — got ${String(name)}.`);
+    }
+    return resolve(name);
+  };
 }
 
 // Running ---------------------------------------------------------------------
@@ -214,12 +232,20 @@ async function run(message: RunMessage): Promise<void> {
 
   const api = createApi(message.commands, host);
   const keys = Object.keys(api);
+  const values: unknown[] = keys.map((key) => api[key]);
+
+  // `use` rides in as one more parameter, so a locked module system is an honest
+  // "use is not defined" rather than a silent no-op.
+  if (message.commands.includes('use')) {
+    keys.push('use');
+    values.push(buildUse(message));
+  }
 
   send({ type: 'ready', lineNumbers: lineOffset.calibrated });
 
   try {
     const script = compile(keys, message.source);
-    await script(...keys.map((key) => api[key]));
+    await script(...values);
     send({ type: 'done' });
   } catch (error) {
     const { name, message: text } = describe(error);

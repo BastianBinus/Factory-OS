@@ -185,3 +185,67 @@ export function createFlower(seed = 1): Group {
   group.add(center);
   return group;
 }
+
+// Composite tiles ------------------------------------------------------------
+
+/**
+ * A biome tile is rarely one thing — it is a patch that may carry several props.
+ * These build a decorated tile from a seed, so the same call yields a different
+ * arrangement per seed and a world made of them never reads as a grid of clones.
+ */
+
+function drop(group: Group, prop: Group | Mesh, x: number, z: number, scale: number): void {
+  prop.position.set(x, 0.07, z);
+  prop.scale.multiplyScalar(scale);
+  group.add(prop);
+}
+
+/** A forest tile: three small trees clustered on grass. */
+export function createForestTile(seed = 1): Group {
+  const group = new Group();
+  group.add(createGroundTile(NATURE.grass));
+  const spots: [number, number][] = [
+    [-0.24 + wobble(seed, 1) * 0.08, -0.2 + wobble(seed, 2) * 0.08],
+    [0.24 + wobble(seed, 3) * 0.08, -0.22 + wobble(seed, 4) * 0.08],
+    [wobble(seed, 5) * 0.1, 0.24 + wobble(seed, 6) * 0.08],
+  ];
+  spots.forEach(([x, z], i) => {
+    const tree = (seed + i) % 2 ? createBroadleaf(seed * 7 + i) : createPine(seed * 5 + i);
+    drop(group, tree, x, z, 0.52);
+  });
+  return group;
+}
+
+/** A meadow tile: grass tufts and a couple of flowers. */
+export function createMeadowTile(seed = 1): Group {
+  const group = new Group();
+  group.add(createGroundTile(NATURE.grass));
+  for (let i = 0; i < 3; i += 1) {
+    drop(group, createGrassTuft(seed * 3 + i), wobble(seed + i, 1) * 0.3, wobble(seed + i, 2) * 0.3, 0.9);
+  }
+  for (let i = 0; i < 2; i += 1) {
+    drop(group, createFlower(seed * 9 + i), wobble(seed + i, 3) * 0.28, wobble(seed + i, 4) * 0.28, 1);
+  }
+  return group;
+}
+
+/** A grove tile: one tree with a bush and a rock at its foot. */
+export function createGroveTile(seed = 1): Group {
+  const group = new Group();
+  group.add(createGroundTile(NATURE.grass));
+  const tree = seed % 2 ? createPine(seed * 5) : createBroadleaf(seed * 7);
+  drop(group, tree, wobble(seed, 1) * 0.12, wobble(seed, 2) * 0.12, 0.62);
+  drop(group, createBush(seed * 2), 0.28, 0.26, 0.7);
+  drop(group, createRock(seed * 4), -0.3, 0.24, 0.55);
+  return group;
+}
+
+/** A rocky tile: a cluster of boulders on bare soil. */
+export function createRockClusterTile(seed = 1): Group {
+  const group = new Group();
+  group.add(createGroundTile(NATURE.soil));
+  for (let i = 0; i < 3; i += 1) {
+    drop(group, createRock(seed * 6 + i), wobble(seed + i, 1) * 0.28, wobble(seed + i, 2) * 0.28, 0.7 + wobble(seed + i, 3) * 0.2);
+  }
+  return group;
+}

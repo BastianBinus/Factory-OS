@@ -1,28 +1,40 @@
 import './style/index';
-import { Group } from 'three';
-import { Color } from 'three';
+import { Color, Group, type Object3D } from 'three';
 import { Scene } from './render/Scene';
 import { readPalette, type WorldPalette } from './render/palette';
-import { WorldGeometry, WorldMaterials, createMachine, createRobot } from './render/meshFactory';
+import type { MachineId } from './game/types';
+import {
+  WorldGeometry,
+  WorldMaterials,
+  createBelt,
+  createMachine,
+  createRobot,
+  createWall,
+} from './render/meshFactory';
 import {
   NATURE,
   createBroadleaf,
   createBush,
   createFlower,
+  createForestTile,
   createGrassTuft,
   createGroundTile,
+  createGroveTile,
+  createMeadowTile,
   createPine,
   createRock,
+  createRockClusterTile,
   createWaterTile,
 } from './render/nature';
 
 /**
  * The asset showroom — a standalone look-test, not part of the game.
  *
- * It stages one keystone diorama (a corner of meadow with a tree line, a rock, a
- * water edge and a single factory building) so the stylised low-poly direction
- * can be judged in isolation and locked before the living-world rebuild spends
- * effort on the full asset list.
+ * Three tabs: a keystone diorama for the overall vibe, a single-asset browser to
+ * step through every piece in isolation, and a variation grid that proves each
+ * biome tile arranges differently per seed instead of cloning. It exists to lock
+ * the stylised low-poly direction before the living-world rebuild commits to the
+ * full asset list.
  */
 
 const app = document.createElement('div');
@@ -35,93 +47,190 @@ const scene = new Scene({ container: app, palette });
 const geometry = new WorldGeometry();
 const materials = new WorldMaterials(palette);
 
-// Diorama --------------------------------------------------------------------
+/** The turntable everything sits on, cleared and refilled when the tab changes. */
+const stage = new Group();
+scene.world.add(stage);
 
-/** A 5×5 patch, its objects placed by hand around the origin so it turns cleanly. */
-const diorama = new Group();
-scene.world.add(diorama);
+let frameHooks: ((delta: number) => void)[] = [];
 
-// A cleared patch of ground where the factory sits: `.` meadow, `~` water, `#` cleared soil.
-const GROUND = [
-  '..~~.',
-  '...~.',
-  '..##.',
-  '...#.',
-  '.....',
+function clearStage(): void {
+  stage.clear();
+  stage.rotation.y = 0;
+  frameHooks = [];
+}
+
+function machineMesh(id: MachineId): Object3D {
+  const view = createMachine(geometry, materials, id);
+  view.setBusy(true);
+  return view.group;
+}
+
+/** A water surface needs a bed under it to read as depth, not a floating pane. */
+function waterAsset(): Group {
+  const group = new Group();
+  const bed = createGroundTile(0x3a6b57);
+  bed.position.y = -0.02;
+  group.add(bed, createWaterTile());
+  return group;
+}
+
+// The catalogue for the single-asset browser. `ground` marks the pieces that
+// bring their own floor, so a bare prop gets a grass tile placed under it.
+interface Entry {
+  name: string;
+  make: () => Object3D;
+  ground?: boolean;
+}
+
+const ASSETS: Entry[] = [
+  { name: 'Boden — Wiese', make: () => createGroundTile(NATURE.grass), ground: true },
+  { name: 'Boden — Erde', make: () => createGroundTile(NATURE.soil), ground: true },
+  { name: 'Boden — Sand', make: () => createGroundTile(NATURE.sand), ground: true },
+  { name: 'Boden — Fels', make: () => createGroundTile(NATURE.rock), ground: true },
+  { name: 'Boden — Wasser', make: () => waterAsset(), ground: true },
+  { name: 'Nadelbaum', make: () => createPine(3) },
+  { name: 'Laubbaum', make: () => createBroadleaf(4) },
+  { name: 'Fels', make: () => createRock(5) },
+  { name: 'Grasbüschel', make: () => createGrassTuft(1) },
+  { name: 'Busch', make: () => createBush(2) },
+  { name: 'Blume', make: () => createFlower(2) },
+  { name: 'Tile — Wald (3 Bäume)', make: () => createForestTile(3), ground: true },
+  { name: 'Tile — Wiese', make: () => createMeadowTile(2), ground: true },
+  { name: 'Tile — Hain', make: () => createGroveTile(1), ground: true },
+  { name: 'Tile — Fels-Cluster', make: () => createRockClusterTile(4), ground: true },
+  { name: 'Smelter', make: () => machineMesh('smelter') },
+  { name: 'Assembler', make: () => machineMesh('assembler') },
+  { name: 'Foundry', make: () => machineMesh('foundry') },
+  { name: 'Seeder', make: () => machineMesh('seeder') },
+  { name: 'Refinery', make: () => machineMesh('refinery') },
+  { name: 'Press', make: () => machineMesh('press') },
+  { name: 'Belt', make: () => createBelt(geometry, materials, 'east') },
+  { name: 'Wand', make: () => createWall(geometry, materials) },
+  { name: 'Roboter', make: () => createRobot(geometry, materials) },
 ];
 
-for (let z = 0; z < GROUND.length; z += 1) {
-  const row = GROUND[z] ?? '';
-  for (let x = 0; x < row.length; x += 1) {
-    const ch = row[x];
-    const wx = x - 2;
-    const wz = z - 2;
-    if (ch === '~') {
-      const bed = createGroundTile(0x3a6b57);
-      bed.position.set(wx, -0.02, wz);
-      diorama.add(bed);
-      const water = createWaterTile();
-      water.position.set(wx, water.position.y, wz);
-      diorama.add(water);
-    } else {
-      const tile = createGroundTile(ch === '#' ? NATURE.soil : NATURE.grass);
-      tile.position.set(wx, 0, wz);
-      diorama.add(tile);
+// Diorama --------------------------------------------------------------------
+
+const GROUND = ['..~~.', '...~.', '..##.', '...#.', '.....'];
+
+function buildDiorama(): void {
+  clearStage();
+  for (let z = 0; z < GROUND.length; z += 1) {
+    const row = GROUND[z] ?? '';
+    for (let x = 0; x < row.length; x += 1) {
+      const ch = row[x];
+      const wx = x - 2;
+      const wz = z - 2;
+      if (ch === '~') {
+        const bed = createGroundTile(0x3a6b57);
+        bed.position.set(wx, -0.02, wz);
+        const water = createWaterTile();
+        water.position.set(wx, water.position.y, wz);
+        stage.add(bed, water);
+      } else {
+        const tile = createGroundTile(ch === '#' ? NATURE.soil : NATURE.grass);
+        tile.position.set(wx, 0, wz);
+        stage.add(tile);
+      }
     }
   }
+
+  const put = (object: Object3D, x: number, z: number): void => {
+    object.position.set(x, 0.07, z);
+    stage.add(object);
+  };
+
+  put(createPine(3), -2, -2);
+  put(createPine(7), -1, -2);
+  put(createBroadleaf(4), -2, -1);
+  put(createPine(11), 2, -1);
+  put(createBush(2), -1, -1);
+  put(createRock(5), 2, 1);
+  put(createRock(9), -2, 2);
+  for (const [x, z, s] of [
+    [0, -2, 1],
+    [-1, 0, 6],
+    [1, 2, 8],
+    [-2, 0, 12],
+  ] as const)
+    put(createGrassTuft(s), x, z);
+  for (const [x, z, s] of [
+    [1, -2, 2],
+    [-1, 1, 5],
+    [0, 2, 9],
+  ] as const)
+    put(createFlower(s), x, z);
+
+  const smelter = createMachine(geometry, materials, 'smelter');
+  smelter.setBusy(true);
+  put(smelter.group, 0, 0);
+  frameHooks.push((d) => smelter.animate(d));
+
+  put(createRobot(geometry, materials), 1, 1);
+
+  scene.setTarget(0, 0);
+  scene.setViewSize(4.2);
 }
 
-/** Drop an object on tile (x, z), where (0, 0) is the diorama's centre. */
-function place(object: Group | import('three').Mesh, x: number, z: number, y = 0.07): void {
-  object.position.set(x, y, z);
-  diorama.add(object);
+// Single asset ---------------------------------------------------------------
+
+let index = 0;
+
+function buildSingle(): void {
+  clearStage();
+  const entry = ASSETS[index]!;
+  if (!entry.ground) {
+    stage.add(createGroundTile(NATURE.grass));
+  }
+  const object = entry.make();
+  if (!entry.ground) object.position.y = 0.07;
+  stage.add(object);
+
+  label.textContent = `${index + 1}/${ASSETS.length}  ·  ${entry.name}`;
+  scene.setTarget(0, 0);
+  scene.setViewSize(1.35);
 }
 
-place(createPine(3), -2, -2);
-place(createPine(7), -1, -2);
-place(createBroadleaf(4), -2, -1);
-place(createPine(11), 2, -1);
-place(createBush(2), -1, -1);
-place(createRock(5), 2, 1);
-place(createRock(9), -2, 2, 0.07);
-place(createGrassTuft(1), 0, -2);
-place(createGrassTuft(6), -1, 0);
-place(createGrassTuft(8), 1, 2);
-place(createGrassTuft(12), -2, 0);
-place(createFlower(2), 1, -2);
-place(createFlower(5), -1, 1);
-place(createFlower(9), 0, 2);
+// Variations -----------------------------------------------------------------
 
-// The factory building on the cleared soil, with the robot beside it.
-const smelter = createMachine(geometry, materials, 'smelter');
-smelter.setBusy(true);
-place(smelter.group, 0, 0);
+function buildVariations(): void {
+  clearStage();
+  const rows: [string, (seed: number) => Group][] = [
+    ['forest', createForestTile],
+    ['meadow', createMeadowTile],
+    ['grove', createGroveTile],
+    ['rocks', createRockClusterTile],
+  ];
+  rows.forEach((entry, r) => {
+    const make = entry[1];
+    for (let c = 0; c < 5; c += 1) {
+      const tile = make(r * 17 + c * 3 + 1);
+      tile.position.set(c - 2, 0, r - 1.5);
+      stage.add(tile);
+    }
+  });
+  scene.setTarget(0, 0);
+  scene.setViewSize(3.6);
+}
 
-const robot = createRobot(geometry, materials);
-place(robot, 1, 1);
-
-// Framing + turntable --------------------------------------------------------
-
-scene.setTarget(0, 0);
-scene.setViewSize(4.2);
+// Frame ----------------------------------------------------------------------
 
 let auto = true;
 let dragging = false;
 
 app.addEventListener('pointerdown', () => {
   dragging = true;
-  auto = false;
 });
 window.addEventListener('pointerup', () => {
   dragging = false;
 });
 app.addEventListener('pointermove', (event) => {
-  if (dragging) diorama.rotation.y += event.movementX * 0.01;
+  if (dragging) stage.rotation.y += event.movementX * 0.01;
 });
 
 scene.start((delta) => {
-  if (auto && !dragging) diorama.rotation.y += delta * 0.25;
-  smelter.animate(delta);
+  if (auto && !dragging) stage.rotation.y += delta * 0.25;
+  for (const hook of frameHooks) hook(delta);
 });
 
 // Day / night ----------------------------------------------------------------
@@ -135,32 +244,82 @@ function nightPalette(day: WorldPalette): WorldPalette {
 }
 
 let night = false;
-const dayNight = nightPalette(palette);
+const dark = nightPalette(palette);
 
-// Controls -------------------------------------------------------------------
+// Chrome ---------------------------------------------------------------------
 
-const bar = document.createElement('div');
-bar.style.cssText =
-  'position:fixed;left:16px;bottom:16px;display:flex;gap:8px;font-family:var(--font-sans,sans-serif);';
-app.appendChild(bar);
+const tabbar = document.createElement('div');
+tabbar.style.cssText =
+  'position:fixed;left:16px;top:16px;display:flex;gap:6px;' +
+  'font-family:var(--font-sans,sans-serif);';
+app.appendChild(tabbar);
 
-function button(label: string, onClick: () => void): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.textContent = label;
+const bottom = document.createElement('div');
+bottom.style.cssText =
+  'position:fixed;left:16px;bottom:16px;display:flex;gap:8px;align-items:center;' +
+  'font-family:var(--font-sans,sans-serif);';
+app.appendChild(bottom);
+
+const label = document.createElement('span');
+label.style.cssText =
+  'padding:8px 12px;border-radius:8px;background:rgba(0,0,0,.45);color:#fff;' +
+  'font-size:13px;backdrop-filter:blur(4px);';
+
+function styleButton(btn: HTMLButtonElement, active = false): void {
   btn.style.cssText =
     'padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.25);' +
-    'background:rgba(0,0,0,.45);color:#fff;font-size:13px;cursor:pointer;backdrop-filter:blur(4px);';
+    `background:rgba(${active ? '255,255,255,.18' : '0,0,0,.45'});color:#fff;` +
+    'font-size:13px;cursor:pointer;backdrop-filter:blur(4px);';
+}
+
+function button(parent: HTMLElement, text: string, onClick: () => void): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.textContent = text;
+  styleButton(btn);
   btn.addEventListener('click', onClick);
-  bar.appendChild(btn);
+  parent.appendChild(btn);
   return btn;
 }
 
-const nightBtn = button('Nacht', () => {
-  night = !night;
-  scene.applyPalette(night ? dayNight : palette);
-  nightBtn.textContent = night ? 'Tag' : 'Nacht';
+type Tab = 'Diorama' | 'Einzeln' | 'Variationen';
+const tabButtons: Record<Tab, HTMLButtonElement> = {} as Record<Tab, HTMLButtonElement>;
+
+function setTab(next: Tab): void {
+  for (const [name, btn] of Object.entries(tabButtons)) styleButton(btn, name === next);
+
+  // The single-asset browser gets its stepper; the others do not.
+  prev.style.display = next === 'Einzeln' ? '' : 'none';
+  nextBtn.style.display = next === 'Einzeln' ? '' : 'none';
+  label.style.display = next === 'Einzeln' ? '' : 'none';
+  auto = next !== 'Variationen';
+
+  if (next === 'Diorama') buildDiorama();
+  else if (next === 'Einzeln') buildSingle();
+  else buildVariations();
+}
+
+for (const name of ['Diorama', 'Einzeln', 'Variationen'] as Tab[]) {
+  tabButtons[name] = button(tabbar, name, () => setTab(name));
+}
+
+const prev = button(bottom, '‹', () => {
+  index = (index - 1 + ASSETS.length) % ASSETS.length;
+  buildSingle();
+});
+bottom.appendChild(label);
+const nextBtn = button(bottom, '›', () => {
+  index = (index + 1) % ASSETS.length;
+  buildSingle();
 });
 
-button('Drehen an/aus', () => {
+button(bottom, 'Nacht', function toggleNight(this: HTMLButtonElement) {
+  night = !night;
+  scene.applyPalette(night ? dark : palette);
+  this.textContent = night ? 'Tag' : 'Nacht';
+});
+
+button(bottom, 'Drehen', () => {
   auto = !auto;
 });
+
+setTab('Diorama');

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Fleet } from '../src/engine/Fleet';
 import type { FleetRunner } from '../src/engine/Fleet';
 import type { ScriptRunnerHandlers, StopReason } from '../src/engine/ScriptRunner';
-import type { StateSnapshot } from '../src/worker/protocol';
+import type { ModuleSource, StateSnapshot } from '../src/worker/protocol';
 
 /**
  * A runner that never opens a worker. It answers the same shape `ScriptRunner`
@@ -23,7 +23,7 @@ class FakeRunner implements FleetRunner {
     readonly handlers: ScriptRunnerHandlers,
   ) {}
 
-  start(source: string, commands: string[], snapshot: StateSnapshot): void {
+  start(source: string, _modules: ModuleSource[], commands: string[], snapshot: StateSnapshot): void {
     this.running = true;
     this.starts.push({ source, commands, snapshot });
   }
@@ -113,7 +113,7 @@ beforeEach(() => {
 describe('Fleet.start', () => {
   it('gives every robot the same source and its own snapshot', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, 'await move("north")', ['move']);
+    fleet.start(TWO, 'await move("north")', [], ['move']);
 
     expect(created).toHaveLength(2);
     expect(fleet.size).toBe(2);
@@ -131,7 +131,7 @@ describe('Fleet.start', () => {
 
   it('is running until the last robot has stopped', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, '', []);
+    fleet.start(TWO, '', [], []);
     expect(fleet.running).toBe(true);
 
     runnerFor('r1').finish();
@@ -145,8 +145,8 @@ describe('Fleet.start', () => {
 
   it('ends a previous run before starting the next one', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, 'first', []);
-    fleet.start(TWO, 'second', []);
+    fleet.start(TWO, 'first', [], []);
+    fleet.start(TWO, 'second', [], []);
 
     expect(created).toHaveLength(4);
     expect(created[0]?.stops).toEqual(['user']);
@@ -157,7 +157,7 @@ describe('Fleet.start', () => {
 describe('Fleet routing', () => {
   it('answers the robot the action came from, and only that one', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, '', []);
+    fleet.start(TWO, '', [], []);
 
     fleet.resolve('r2', 7, 'ok', snapshotFor('r2', 1));
     fleet.reject('r1', 8, 'blocked', snapshotFor('r1', 0));
@@ -170,14 +170,14 @@ describe('Fleet routing', () => {
 
   it('ignores an answer for a robot that is no longer in the fleet', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, '', []);
+    fleet.start(TWO, '', [], []);
 
     expect(() => fleet.resolve('r9', 1, null, snapshotFor('r9', 0))).not.toThrow();
   });
 
   it('tags actions and logs with the robot that produced them', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, '', []);
+    fleet.start(TWO, '', [], []);
 
     runnerFor('r2').handlers.onAction({ type: 'action', id: 1, command: 'mine', args: [], line: 2 });
     runnerFor('r1').handlers.onLog?.('hello', 4);
@@ -190,7 +190,7 @@ describe('Fleet routing', () => {
 describe('Fleet stopping', () => {
   it('stops the whole fleet when one robot fails', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, '', []);
+    fleet.start(TWO, '', [], []);
 
     runnerFor('r1').crash('mine() found no ore');
 
@@ -202,7 +202,7 @@ describe('Fleet stopping', () => {
 
   it('reports the worst reason once, not one per robot', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, '', []);
+    fleet.start(TWO, '', [], []);
 
     runnerFor('r1').finish();
     runnerFor('r2').stop('timeout');
@@ -212,7 +212,7 @@ describe('Fleet stopping', () => {
 
   it('announces idle a single time when the player stops the run', () => {
     const fleet = makeFleet();
-    fleet.start(TWO, '', []);
+    fleet.start(TWO, '', [], []);
 
     fleet.stop('user');
 

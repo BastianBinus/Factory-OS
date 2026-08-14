@@ -76,6 +76,10 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
     detail: 'me()',
     info: 'Which robot is running this copy of the script, as {id, index}. Costs no tick.',
   },
+  use: {
+    detail: "use('pathfinding')",
+    info: 'Pull in one of your modules. Returns what it exports. Costs no tick.',
+  },
   reset: {
     detail: 'await reset()',
     info: 'Put the floor back to the start: robots parked, ripe patches full. What they carry, and your unlocks, stay. Costs no tick.',
@@ -83,7 +87,7 @@ const COMMAND_INFO: Record<string, { detail: string; info: string }> = {
 };
 
 /** Commands that block are worth spelling out with their `await`. */
-const INSTANT = new Set(['print', 'position', 'inventory', 'me']);
+const INSTANT = new Set(['print', 'position', 'inventory', 'me', 'use']);
 
 function completionsFor(commands: string[]): Completion[] {
   return commands.map((name) => {

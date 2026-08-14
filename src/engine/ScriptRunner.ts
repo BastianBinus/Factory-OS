@@ -1,4 +1,10 @@
-import type { ActionMessage, MainToWorker, StateSnapshot, WorkerToMain } from '../worker/protocol';
+import type {
+  ActionMessage,
+  MainToWorker,
+  ModuleSource,
+  StateSnapshot,
+  WorkerToMain,
+} from '../worker/protocol';
 
 /**
  * Owns the worker the player's script runs in.
@@ -43,7 +49,7 @@ export class ScriptRunner {
     return this.worker !== null;
   }
 
-  start(source: string, commands: string[], snapshot: StateSnapshot): void {
+  start(source: string, modules: ModuleSource[], commands: string[], snapshot: StateSnapshot): void {
     this.stop('user');
 
     const worker = new Worker(new URL('../worker/sandbox.worker.ts', import.meta.url), {
@@ -65,7 +71,7 @@ export class ScriptRunner {
       this.stop('error');
     });
 
-    this.send({ type: 'run', source, commands, snapshot });
+    this.send({ type: 'run', source, modules, commands, snapshot });
     this.armWatchdog();
   }
 

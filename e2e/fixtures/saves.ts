@@ -71,7 +71,7 @@ function rawGround(): Record<string, unknown> {
  */
 export function currentSave(script: string, size = 8): Record<string, unknown> {
   return {
-    version: 5,
+    version: 6,
     tick: 0,
     grid: {
       width: size,
@@ -86,6 +86,7 @@ export function currentSave(script: string, size = 8): Record<string, unknown> {
     onboardingStep: ONBOARDING_DONE,
     stats: { tilesMoved: 0, oreMined: 0, crafted: {} },
     script,
+    modules: [],
     tickRateMs: 20,
     inventoryCapacity: 20,
   };

@@ -88,6 +88,8 @@ export function createApi(commands: readonly string[], host: ApiHost): Record<st
 
   for (const command of commands) {
     if (INSTANT.has(command)) continue;
+    // `use` is not an action; the worker builds it from the module set instead.
+    if (command === 'use') continue;
 
     if (command === 'wait') {
       // One tick is the only unit the engine has, so n ticks are n waits. The

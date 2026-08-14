@@ -1,7 +1,7 @@
 import './style/index';
 import './boot.css';
 import { initTheme, onThemeChange } from './ui/ThemeToggle';
-import { ONBOARDING_DONE, primaryRobot, resetWorld } from './game/GameState';
+import { ONBOARDING_DONE, hasUnlock, primaryRobot, resetWorld } from './game/GameState';
 import type { GameState, GroundTile, UnlockId } from './game/types';
 import { buyUnlock, getUnlock, unlockedCommands } from './game/progression';
 import { cloudConcepts, markConceptSeen, unseenConcepts } from './game/concepts';
@@ -320,11 +320,17 @@ const authPanel = new AuthPanel({
 
 const codePanel = new CodePanel({
   parent: app,
-  doc: state.script,
+  script: state.script,
+  modules: state.modules,
+  modulesEnabled: hasUnlock(state, 'script_modules'),
   commands: unlockedCommands(state),
-  onChange: (doc) => {
-    state.script = doc;
+  onScriptChange: (script) => {
+    state.script = script;
     checkOnboarding();
+    scheduleSave();
+  },
+  onModulesChange: (modules) => {
+    state.modules = modules;
     scheduleSave();
   },
   onRun: () => runScript(),
@@ -538,6 +544,7 @@ let lastShape = worldShape();
  */
 function applyProgress(): void {
   codePanel.editor.setCommands(unlockedCommands(state));
+  codePanel.setModulesEnabled(hasUnlock(state, 'script_modules'));
   scheduler.setTickRate(state.tickRateMs);
 
   const shape = worldShape();
@@ -569,7 +576,7 @@ function adoptCloudSave(next: GameState): void {
   queue.clear();
 
   Object.assign(state, next);
-  codePanel.editor.value = state.script;
+  codePanel.setDocs(state.script, state.modules);
 
   applyProgress();
   worldView.sync(state);
@@ -632,7 +639,7 @@ function runScript(): void {
     snapshot: snapshotOf(robot.id),
   }));
 
-  fleet.start(members, codePanel.editor.value, unlockedCommands(state));
+  fleet.start(members, codePanel.getScript(), codePanel.getModules(), unlockedCommands(state));
   scheduler.setTickRate(state.tickRateMs);
   scheduler.start();
   controls.update({ running: true, paused: false });

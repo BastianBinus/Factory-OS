@@ -57,6 +57,7 @@ Nächster konkreter Schritt nach Abnahme: **Welle 1**.
 ## Natürliche Deko (nicht-interaktiv)
 - [x] Wiese: Grasbüschel — gebaut
 - [x] Wiese: Blumen — gebaut
+- [~] Wiese: Blumenwiese-Tile + Hohes Gras — `createFlowerPatch` / `createTallGrass`, Welle 1
 - [x] Wiese: Busch — gebaut
 - [x] Wiese: Stein — gebaut
 - [x] Wald: Baum (Nadel) — gebaut
@@ -78,8 +79,8 @@ Nächster konkreter Schritt nach Abnahme: **Welle 1**.
 - [ ] Strand: Palme
 
 ## Ressourcen-Knoten (interaktiv, mit Zuständen: voll / abgebaut / nachwachsend)
-- [ ] Wiese: Cultivation-Feld (bestehend, Zustände fehlen)
-- [ ] Wiese: Eisen-Vorkommen
+- [~] Wiese: Cultivation-Feld — `createFarmPlot` (brach/wachsend/reif), Welle 1
+- [~] Wiese: Eisen-Vorkommen — `createIronNode` (voll/abgebaut/nachwachsend), Welle 1
 - [ ] Wald: erntbarer Baum (Holz)
 - [ ] Wüste: Sand-/Silizium-Knoten
 - [ ] Berge: Erz-/Kohle-/Stein-Ader

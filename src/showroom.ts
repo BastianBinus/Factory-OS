@@ -226,6 +226,45 @@ function buildVariations(): void {
   scene.setViewSize(3.6);
 }
 
+// Random grid ----------------------------------------------------------------
+
+/**
+ * A quick "what does a patch of world look like" roll: a square grid where each
+ * cell is a randomly chosen tile on a fresh random seed. Re-rolls every call.
+ */
+function buildRandom(): void {
+  clearStage();
+  const N = 6;
+  const makers: ((seed: number) => Object3D)[] = [
+    (s) => createForestTile(s),
+    (s) => createMeadowTile(s),
+    (s) => createGroveTile(s),
+    (s) => createRockClusterTile(s),
+    () => waterAsset(),
+    (s) => {
+      const g = new Group();
+      g.add(createGroundTile(NATURE.grass));
+      const prop = s % 2 ? createBush(s) : createRock(s);
+      prop.position.set(0, 0.07, 0);
+      prop.scale.multiplyScalar(0.72);
+      g.add(prop);
+      return g;
+    },
+  ];
+
+  for (let z = 0; z < N; z += 1) {
+    for (let x = 0; x < N; x += 1) {
+      const make = makers[Math.floor(Math.random() * makers.length)]!;
+      const tile = make(Math.floor(Math.random() * 9999) + 1);
+      tile.position.set(x - (N - 1) / 2, 0, z - (N - 1) / 2);
+      stage.add(tile);
+    }
+  }
+
+  scene.setTarget(0, 0);
+  scene.setViewSize(5.4);
+}
+
 // Frame ----------------------------------------------------------------------
 
 let auto = true;
@@ -367,7 +406,7 @@ document.head.appendChild(style);
 
 // Tab bar (top-left) ---------------------------------------------------------
 
-type Tab = 'Diorama' | 'Einzeln' | 'Variationen';
+type Tab = 'Diorama' | 'Einzeln' | 'Variationen' | 'Zufall';
 
 const tabbar = document.createElement('div');
 tabbar.className = 'sr-group sr-group--top';
@@ -375,7 +414,7 @@ tabbar.style.cssText += ';position:fixed;left:20px;top:20px;';
 app.appendChild(tabbar);
 
 const tabButtons: Record<Tab, HTMLButtonElement> = {} as Record<Tab, HTMLButtonElement>;
-for (const name of ['Diorama', 'Einzeln', 'Variationen'] as Tab[]) {
+for (const name of ['Diorama', 'Einzeln', 'Variationen', 'Zufall'] as Tab[]) {
   const btn = document.createElement('button');
   btn.className = 'sr-pill';
   btn.textContent = name;
@@ -435,7 +474,13 @@ spinBtn.addEventListener('click', () => {
   updateControls();
 });
 
-controls.append(prev, singleLabel, nextBtn, sep, nightBtn, spinBtn);
+// Only shown on the Zufall tab — re-rolls the random grid in place.
+const diceBtn = document.createElement('button');
+diceBtn.className = 'sr-pill';
+diceBtn.textContent = '⚄ Würfeln';
+diceBtn.addEventListener('click', () => buildRandom());
+
+controls.append(prev, singleLabel, nextBtn, sep, nightBtn, spinBtn, diceBtn);
 
 function updateControls(): void {
   nightBtn.textContent = night ? 'Tag' : 'Nacht';
@@ -517,6 +562,7 @@ function setTab(next: Tab): void {
   nextBtn.style.display = isSingle ? '' : 'none';
   sep.style.display = isSingle ? '' : 'none';
   panel.style.display = isSingle ? 'flex' : 'none';
+  diceBtn.style.display = next === 'Zufall' ? '' : 'none';
   // Keep the control bar centred in the space left of the open rail.
   bottomWrap.style.paddingRight = isSingle ? '308px' : '0px';
 
@@ -525,7 +571,8 @@ function setTab(next: Tab): void {
 
   if (next === 'Diorama') buildDiorama();
   else if (isSingle) buildSingle();
-  else buildVariations();
+  else if (next === 'Variationen') buildVariations();
+  else buildRandom();
 }
 
 setTab('Diorama');

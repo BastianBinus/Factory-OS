@@ -187,6 +187,7 @@ function buildSingle(): void {
   stage.add(object);
 
   label.textContent = `${index + 1}/${ASSETS.length}  ·  ${entry.name}`;
+  highlightGrid();
   scene.setTarget(0, 0);
   scene.setViewSize(1.35);
 }
@@ -265,6 +266,40 @@ label.style.cssText =
   'padding:8px 12px;border-radius:8px;background:rgba(0,0,0,.45);color:#fff;' +
   'font-size:13px;backdrop-filter:blur(4px);';
 
+// The quick-pick grid down the right edge — every asset as a small button so the
+// single-asset browser is jump-to, not just click-through.
+const grid = document.createElement('div');
+grid.style.cssText =
+  'position:fixed;right:16px;top:16px;bottom:16px;width:180px;display:grid;' +
+  'grid-template-columns:1fr 1fr;grid-auto-rows:min-content;gap:6px;overflow-y:auto;' +
+  'padding:4px;font-family:var(--font-sans,sans-serif);';
+app.appendChild(grid);
+
+const gridButtons = ASSETS.map((entry, i) => {
+  const btn = document.createElement('button');
+  btn.textContent = entry.name;
+  btn.style.cssText =
+    'padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.2);' +
+    'background:rgba(0,0,0,.45);color:#fff;font-size:11px;line-height:1.2;cursor:pointer;' +
+    'backdrop-filter:blur(4px);text-align:left;';
+  btn.addEventListener('click', () => {
+    index = i;
+    buildSingle();
+  });
+  grid.appendChild(btn);
+  return btn;
+});
+
+/** Mark the active asset in the quick-pick grid and scroll it into view. */
+function highlightGrid(): void {
+  gridButtons.forEach((btn, i) => {
+    const active = i === index;
+    btn.style.background = active ? 'rgba(120,200,120,.35)' : 'rgba(0,0,0,.45)';
+    btn.style.borderColor = active ? 'rgba(150,230,150,.8)' : 'rgba(255,255,255,.2)';
+    if (active) btn.scrollIntoView({ block: 'nearest' });
+  });
+}
+
 function styleButton(btn: HTMLButtonElement, active = false): void {
   btn.style.cssText =
     'padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.25);' +
@@ -287,10 +322,11 @@ const tabButtons: Record<Tab, HTMLButtonElement> = {} as Record<Tab, HTMLButtonE
 function setTab(next: Tab): void {
   for (const [name, btn] of Object.entries(tabButtons)) styleButton(btn, name === next);
 
-  // The single-asset browser gets its stepper; the others do not.
+  // The single-asset browser gets its stepper and quick-pick grid; others do not.
   prev.style.display = next === 'Einzeln' ? '' : 'none';
   nextBtn.style.display = next === 'Einzeln' ? '' : 'none';
   label.style.display = next === 'Einzeln' ? '' : 'none';
+  grid.style.display = next === 'Einzeln' ? 'grid' : 'none';
   auto = next !== 'Variationen';
 
   if (next === 'Diorama') buildDiorama();

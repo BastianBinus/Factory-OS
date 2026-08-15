@@ -16,15 +16,19 @@ import {
   NATURE,
   createBroadleaf,
   createBush,
+  createFarmPlot,
   createFlower,
+  createFlowerPatch,
   createForestTile,
   createGrassTuft,
   createGroundTile,
   createGroveTile,
+  createIronNode,
   createMeadowTile,
   createPine,
   createRock,
   createRockClusterTile,
+  createTallGrass,
   createWaterTile,
 } from './render/nature';
 
@@ -92,6 +96,8 @@ interface Entry {
   group: string;
   make: () => Object3D;
   ground?: boolean;
+  /** Build wave this asset belongs to; 0 = the keystone set. */
+  wave?: number;
 }
 
 const ASSETS: Entry[] = [
@@ -106,10 +112,18 @@ const ASSETS: Entry[] = [
   { group: 'Natur', name: 'Grasbüschel', make: () => createGrassTuft(1) },
   { group: 'Natur', name: 'Busch', make: () => createBush(2) },
   { group: 'Natur', name: 'Blume', make: () => createFlower(2) },
+  { group: 'Natur', name: 'Hohes Gras', wave: 1, make: () => createTallGrass(3) },
   { group: 'Tiles', name: 'Tile — Wald (3 Bäume)', make: () => createForestTile(3), ground: true },
   { group: 'Tiles', name: 'Tile — Wiese', make: () => createMeadowTile(2), ground: true },
   { group: 'Tiles', name: 'Tile — Hain', make: () => createGroveTile(1), ground: true },
   { group: 'Tiles', name: 'Tile — Fels-Cluster', make: () => createRockClusterTile(4), ground: true },
+  { group: 'Tiles', name: 'Tile — Blumenwiese', wave: 1, make: () => createFlowerPatch(2), ground: true },
+  { group: 'Ressourcen', name: 'Eisen — voll', wave: 1, make: () => createIronNode(4, 'full') },
+  { group: 'Ressourcen', name: 'Eisen — abgebaut', wave: 1, make: () => createIronNode(4, 'mined') },
+  { group: 'Ressourcen', name: 'Eisen — nachwachsend', wave: 1, make: () => createIronNode(4, 'regrowing') },
+  { group: 'Ressourcen', name: 'Feld — brach', wave: 1, make: () => createFarmPlot('mined'), ground: true },
+  { group: 'Ressourcen', name: 'Feld — wachsend', wave: 1, make: () => createFarmPlot('regrowing'), ground: true },
+  { group: 'Ressourcen', name: 'Feld — reif', wave: 1, make: () => createFarmPlot('full'), ground: true },
   { group: 'Produktion', name: 'Smelter', make: () => machineMesh('smelter') },
   { group: 'Produktion', name: 'Assembler', make: () => machineMesh('assembler') },
   { group: 'Produktion', name: 'Foundry', make: () => machineMesh('foundry') },
@@ -363,6 +377,21 @@ style.textContent = `
   .sr-panel__title { color: ${C.text}; font-size: 12px; font-weight: 600; letter-spacing: -.01em; }
   .sr-panel__meta { color: ${C.faint}; font: 500 10px var(--font-mono); letter-spacing: .08em; }
 
+  .sr-filter {
+    display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 12px;
+    border-bottom: 1px solid ${C.border};
+  }
+  .sr-filter button {
+    padding: 3px 10px; border: 1px solid ${C.border}; border-radius: 999px;
+    background: transparent; color: ${C.muted};
+    font: 600 10.5px var(--font-ui); letter-spacing: -.01em; cursor: pointer;
+    transition: all ${C.ease};
+  }
+  .sr-filter button:hover { background: ${C.surface2}; color: ${C.text}; }
+  .sr-filter button.is-active {
+    background: ${C.accent}; border-color: ${C.accent}; color: #14181f;
+  }
+
   .sr-grid {
     display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: min-content;
     gap: 8px; padding: 12px; overflow-y: auto; scroll-behavior: smooth;
@@ -517,6 +546,11 @@ function updateMeta(): void {
     `${String(loaded.size).padStart(2, '0')}/${ASSETS.length} geladen`;
 }
 
+// Wave filter row — narrows the rail to one build wave (or all).
+const filterBar = document.createElement('div');
+filterBar.className = 'sr-filter';
+panel.appendChild(filterBar);
+
 const gridEl = document.createElement('div');
 gridEl.className = 'sr-grid';
 panel.appendChild(gridEl);
@@ -583,46 +617,98 @@ const thumbObserver = new IntersectionObserver(
   { root: gridEl, rootMargin: '140px 0px' },
 );
 
-// Build the grouped rail once — the catalogue is static, only selection changes.
+// Build the grouped rail once. Sections are kept so the wave filter can hide the
+// ones it empties and recount their visible members.
+interface Section {
+  el: HTMLElement;
+  countEl: HTMLElement;
+  indices: number[];
+}
+const sections: Section[] = [];
 const gridButtons: HTMLButtonElement[] = new Array(ASSETS.length);
-let seen = '';
-ASSETS.forEach((entry, i) => {
-  if (entry.group !== seen) {
-    seen = entry.group;
-    const count = ASSETS.filter((a) => a.group === entry.group).length;
-    const section = document.createElement('div');
-    section.className = 'sr-section';
-    section.innerHTML =
-      `<span>${entry.group}</span>` +
-      `<span class="sr-section__rule"></span>` +
-      `<span>${String(count).padStart(2, '0')}</span>`;
-    gridEl.appendChild(section);
+
+const groupOrder: string[] = [];
+for (const entry of ASSETS) if (!groupOrder.includes(entry.group)) groupOrder.push(entry.group);
+
+for (const groupName of groupOrder) {
+  const indices = ASSETS.map((a, i) => (a.group === groupName ? i : -1)).filter((i) => i >= 0);
+
+  const section = document.createElement('div');
+  section.className = 'sr-section';
+  const titleEl = document.createElement('span');
+  titleEl.textContent = groupName;
+  const rule = document.createElement('span');
+  rule.className = 'sr-section__rule';
+  const countEl = document.createElement('span');
+  countEl.textContent = String(indices.length).padStart(2, '0');
+  section.append(titleEl, rule, countEl);
+  gridEl.appendChild(section);
+  sections.push({ el: section, countEl, indices });
+
+  for (const i of indices) {
+    const entry = ASSETS[i]!;
+    const btn = document.createElement('button');
+    btn.className = 'sr-asset';
+
+    const thumb = document.createElement('span');
+    thumb.className = 'sr-thumb';
+    thumb.dataset['idx'] = String(i);
+    thumb.textContent = shortLabel(entry.name);
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'sr-asset__label';
+    nameEl.textContent = entry.name;
+
+    btn.append(thumb, nameEl);
+    btn.addEventListener('click', () => {
+      index = i;
+      buildSingle();
+    });
+    gridEl.appendChild(btn);
+    gridButtons[i] = btn;
+    thumbEls[i] = thumb;
+    thumbObserver.observe(thumb);
   }
-
-  const btn = document.createElement('button');
-  btn.className = 'sr-asset';
-
-  const thumb = document.createElement('span');
-  thumb.className = 'sr-thumb';
-  thumb.dataset['idx'] = String(i);
-  thumb.textContent = shortLabel(entry.name);
-
-  const nameEl = document.createElement('span');
-  nameEl.className = 'sr-asset__label';
-  nameEl.textContent = entry.name;
-
-  btn.append(thumb, nameEl);
-  btn.addEventListener('click', () => {
-    index = i;
-    buildSingle();
-  });
-  gridEl.appendChild(btn);
-  gridButtons[i] = btn;
-  thumbEls[i] = thumb;
-  thumbObserver.observe(thumb);
-});
+}
 
 updateMeta();
+
+// Wave filter buttons: Alle · W0 · W1 · …
+let waveFilter: number | 'all' = 'all';
+const filterButtons = new Map<number | 'all', HTMLButtonElement>();
+
+function assetInFilter(entry: Entry): boolean {
+  return waveFilter === 'all' || (entry.wave ?? 0) === waveFilter;
+}
+
+function applyFilter(): void {
+  ASSETS.forEach((entry, i) => {
+    gridButtons[i]!.style.display = assetInFilter(entry) ? '' : 'none';
+  });
+  for (const section of sections) {
+    const visible = section.indices.filter((i) => assetInFilter(ASSETS[i]!)).length;
+    section.el.style.display = visible ? '' : 'none';
+    section.countEl.textContent = String(visible).padStart(2, '0');
+  }
+}
+
+function makeFilterButton(key: number | 'all', text: string, title: string): void {
+  const btn = document.createElement('button');
+  btn.textContent = text;
+  btn.title = title;
+  btn.addEventListener('click', () => {
+    waveFilter = key;
+    for (const [other, b] of filterButtons) b.classList.toggle('is-active', other === key);
+    applyFilter();
+  });
+  filterBar.appendChild(btn);
+  filterButtons.set(key, btn);
+}
+
+const waves = Array.from(new Set(ASSETS.map((a) => a.wave ?? 0))).sort((a, b) => a - b);
+makeFilterButton('all', 'Alle', 'Alle Wellen');
+for (const w of waves) makeFilterButton(w, `W${w}`, `Welle ${w}`);
+filterButtons.get('all')!.classList.add('is-active');
 
 /** Mark the active asset in the rail and scroll it into view. */
 function highlightGrid(): void {

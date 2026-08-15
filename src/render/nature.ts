@@ -5,6 +5,7 @@ import {
   Mesh,
   MeshStandardMaterial,
   Group,
+  OctahedronGeometry,
   PlaneGeometry,
 } from 'three';
 import { chamferedBox } from './meshFactory';
@@ -247,5 +248,114 @@ export function createRockClusterTile(seed = 1): Group {
   for (let i = 0; i < 3; i += 1) {
     drop(group, createRock(seed * 6 + i), wobble(seed + i, 1) * 0.28, wobble(seed + i, 2) * 0.28, 0.7 + wobble(seed + i, 3) * 0.2);
   }
+  return group;
+}
+
+/** A denser meadow: grass tufts under a scatter of bright flowers. */
+export function createFlowerPatch(seed = 1): Group {
+  const group = new Group();
+  group.add(createGroundTile(NATURE.grass));
+  for (let i = 0; i < 3; i += 1) {
+    drop(group, createGrassTuft(seed * 3 + i), wobble(seed + i, 1) * 0.32, wobble(seed + i, 2) * 0.32, 0.8);
+  }
+  for (let i = 0; i < 6; i += 1) {
+    drop(group, createFlower(seed * 11 + i), wobble(seed * 2 + i, 3) * 0.34, wobble(seed * 2 + i, 4) * 0.34, 1);
+  }
+  return group;
+}
+
+// Plains — extra prop --------------------------------------------------------
+
+/** A taller, fuller grass clump — a coarser variant of the little tuft. */
+export function createTallGrass(seed = 1): Group {
+  const group = new Group();
+  const blades = 7;
+  for (let i = 0; i < blades; i += 1) {
+    const h = 0.32 + wobble(seed + i, 1) * 0.08;
+    const blade = new Mesh(new ConeGeometry(0.028, h, 4), matte(i % 3 === 0 ? NATURE.grass : NATURE.grassBlade));
+    blade.castShadow = true;
+    blade.position.set(wobble(seed + i, 2) * 0.16, h / 2, wobble(seed + i, 3) * 0.16);
+    blade.rotation.z = wobble(seed + i, 4) * 0.35;
+    group.add(blade);
+  }
+  return group;
+}
+
+// Resource nodes -------------------------------------------------------------
+
+/**
+ * A resource node reads through its state: full carries the harvestable stuff,
+ * mined is spent rubble, regrowing is a hint of it coming back. Same silhouette
+ * across states so it stays recognisable as "the iron spot".
+ */
+
+const IRON = { rock: 0x6f7885, rockDeep: 0x565e69, crystal: 0xaebccc } as const;
+
+export type NodeState = 'full' | 'mined' | 'regrowing';
+
+/** An iron vein: a rocky base with steel-blue crystal shards poking out. */
+export function createIronNode(seed = 1, state: NodeState = 'full'): Group {
+  const group = new Group();
+
+  const base = solid(new Mesh(new IcosahedronGeometry(0.34, 0), matte(IRON.rockDeep)));
+  base.scale.set(1.1 + wobble(seed, 1) * 0.2, 0.5 + wobble(seed, 2) * 0.1, 1.1 + wobble(seed, 3) * 0.2);
+  base.position.y = 0.1;
+  base.rotation.y = wobble(seed, 4) * Math.PI;
+  group.add(base);
+
+  const shard = (x: number, z: number, tall: number, s: number): void => {
+    const crystal = solid(new Mesh(new OctahedronGeometry(0.09, 0), matte(IRON.crystal)));
+    crystal.scale.set(0.7, tall, 0.7);
+    crystal.position.set(x, 0.15 + tall * 0.09, z);
+    crystal.rotation.y = wobble(s, 5) * Math.PI;
+    group.add(crystal);
+  };
+
+  if (state === 'full') {
+    shard(0, 0, 1.7, seed);
+    shard(0.15, -0.1, 1.1, seed + 1);
+    shard(-0.13, 0.12, 1.35, seed + 2);
+    shard(0.05, 0.16, 0.9, seed + 3);
+  } else if (state === 'regrowing') {
+    shard(0.02, 0, 0.8, seed);
+    shard(-0.1, 0.09, 0.55, seed + 1);
+  } else {
+    // Mined out: only loose rubble left in the hollow.
+    for (let i = 0; i < 3; i += 1) {
+      const bit = solid(new Mesh(new IcosahedronGeometry(0.07, 0), matte(IRON.rock)));
+      bit.position.set(wobble(seed + i, 1) * 0.2, 0.08, wobble(seed + i, 2) * 0.2);
+      bit.rotation.y = wobble(seed + i, 3) * Math.PI;
+      group.add(bit);
+    }
+  }
+
+  return group;
+}
+
+/** A cultivation plot: tilled ridges that stay bare, sprout, or ripen. */
+export function createFarmPlot(state: NodeState = 'full'): Group {
+  const group = new Group();
+  group.add(createGroundTile(0x6f5334));
+
+  const rows = 4;
+  for (let r = 0; r < rows; r += 1) {
+    const z = -0.33 + r * 0.22;
+    const ridge = solid(new Mesh(chamferedBox(0.86, 0.06, 0.12, 0.03, 0.01), matte(0x87683f)));
+    ridge.position.set(0, 0.11, z);
+    group.add(ridge);
+
+    if (state === 'mined') continue; // fallow: bare ridges
+
+    const ripe = state === 'full';
+    for (let c = 0; c < 5; c += 1) {
+      const x = -0.34 + c * 0.17;
+      const h = ripe ? 0.16 : 0.08;
+      const crop = new Mesh(new ConeGeometry(ripe ? 0.04 : 0.025, h, 5), matte(ripe ? 0xd2b24a : 0x6fae4c));
+      crop.castShadow = true;
+      crop.position.set(x, 0.14 + h / 2, z);
+      group.add(crop);
+    }
+  }
+
   return group;
 }

@@ -1,6 +1,7 @@
 import './style/index';
 import { Color, Group, type Object3D } from 'three';
 import { Scene } from './render/Scene';
+import { Thumbnailer } from './render/thumbnailer';
 import { readPalette, type WorldPalette } from './render/palette';
 import type { MachineId } from './game/types';
 import {
@@ -389,12 +390,18 @@ style.textContent = `
   .sr-asset:hover { border-color: ${C.borderStrong}; background: ${C.surface2}; }
   .sr-asset.is-active { border-left-color: ${C.accent}; background: ${C.surface2}; }
 
+  @keyframes srShimmer { 0% { background-position: -160px 0; } 100% { background-position: 160px 0; } }
   .sr-thumb {
     display: flex; align-items: flex-end; padding: 6px; aspect-ratio: 1;
     border-radius: 4px; border: 1px solid ${C.border};
-    background: repeating-linear-gradient(135deg, ${C.surface2} 0 6px, #191d25 6px 12px);
-    color: ${C.muted}; font: 500 8.5px/1.2 var(--font-mono);
+    background: linear-gradient(90deg, ${C.surface} 0%, ${C.surface2} 50%, ${C.surface} 100%);
+    background-size: 320px 100%; animation: srShimmer 1.1s linear infinite;
+    color: ${C.faint}; font: 500 8.5px/1.2 var(--font-mono);
     letter-spacing: .06em; text-transform: uppercase; overflow: hidden;
+  }
+  .sr-thumb.is-loaded {
+    background-color: #12151c; background-repeat: no-repeat;
+    background-position: center; background-size: cover; animation: none;
   }
   .sr-asset__label {
     display: block; padding: 0 2px; color: ${C.muted};
@@ -497,10 +504,18 @@ app.appendChild(panel);
 
 const panelHead = document.createElement('div');
 panelHead.className = 'sr-panel__head';
-panelHead.innerHTML =
-  `<span class="sr-panel__title">Assets</span>` +
-  `<span class="sr-panel__meta">${ASSETS.length} Objekte</span>`;
+const panelTitle = document.createElement('span');
+panelTitle.className = 'sr-panel__title';
+panelTitle.textContent = 'Assets';
+const panelMeta = document.createElement('span');
+panelMeta.className = 'sr-panel__meta';
+panelHead.append(panelTitle, panelMeta);
 panel.appendChild(panelHead);
+
+function updateMeta(): void {
+  panelMeta.textContent =
+    `${String(loaded.size).padStart(2, '0')}/${ASSETS.length} geladen`;
+}
 
 const gridEl = document.createElement('div');
 gridEl.className = 'sr-grid';
@@ -510,6 +525,63 @@ panel.appendChild(gridEl);
 function shortLabel(name: string): string {
   return name.replace(/^(Boden|Tile) — /, '');
 }
+
+/** The same composition the single view shows: bare props get a grass tile. */
+function composed(entry: Entry): Object3D {
+  const object = entry.make();
+  if (entry.ground) return object;
+  const group = new Group();
+  group.add(createGroundTile(NATURE.grass));
+  object.position.y = 0.07;
+  group.add(object);
+  return group;
+}
+
+// Real per-asset previews, rendered off-screen and lazily as cards scroll in.
+const thumbnailer = new Thumbnailer(160);
+const thumbEls: HTMLElement[] = new Array(ASSETS.length);
+const loaded = new Set<number>();
+const queued = new Set<number>();
+const queue: number[] = [];
+
+// Render one thumbnail per tick so a scroll never renders a dozen at once.
+let draining = false;
+function drain(): void {
+  const i = queue.shift();
+  if (i === undefined) {
+    draining = false;
+    return;
+  }
+  draining = true;
+  const thumb = thumbEls[i];
+  const entry = ASSETS[i];
+  if (thumb && entry && !loaded.has(i)) {
+    thumb.style.backgroundImage = `url(${thumbnailer.render(composed(entry))})`;
+    thumb.textContent = '';
+    thumb.classList.add('is-loaded');
+    loaded.add(i);
+    updateMeta();
+  }
+  setTimeout(drain, 60);
+}
+
+function enqueueThumb(i: number): void {
+  if (loaded.has(i) || queued.has(i)) return;
+  queued.add(i);
+  queue.push(i);
+  if (!draining) drain();
+}
+
+const thumbObserver = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      thumbObserver.unobserve(entry.target);
+      enqueueThumb(Number((entry.target as HTMLElement).dataset['idx']));
+    }
+  },
+  { root: gridEl, rootMargin: '140px 0px' },
+);
 
 // Build the grouped rail once — the catalogue is static, only selection changes.
 const gridButtons: HTMLButtonElement[] = new Array(ASSETS.length);
@@ -529,16 +601,28 @@ ASSETS.forEach((entry, i) => {
 
   const btn = document.createElement('button');
   btn.className = 'sr-asset';
-  btn.innerHTML =
-    `<span class="sr-thumb">${shortLabel(entry.name)}</span>` +
-    `<span class="sr-asset__label">${entry.name}</span>`;
+
+  const thumb = document.createElement('span');
+  thumb.className = 'sr-thumb';
+  thumb.dataset['idx'] = String(i);
+  thumb.textContent = shortLabel(entry.name);
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'sr-asset__label';
+  nameEl.textContent = entry.name;
+
+  btn.append(thumb, nameEl);
   btn.addEventListener('click', () => {
     index = i;
     buildSingle();
   });
   gridEl.appendChild(btn);
   gridButtons[i] = btn;
+  thumbEls[i] = thumb;
+  thumbObserver.observe(thumb);
 });
+
+updateMeta();
 
 /** Mark the active asset in the rail and scroll it into view. */
 function highlightGrid(): void {

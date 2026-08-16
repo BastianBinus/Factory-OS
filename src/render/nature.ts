@@ -145,11 +145,11 @@ export function createRock(seed = 1): Mesh {
 /** A clump of grass blades — thin cones fanned out at slight tilts. */
 export function createGrassTuft(seed = 1): Group {
   const group = new Group();
-  const blades = 5;
+  const blades = 9;
   for (let i = 0; i < blades; i += 1) {
-    const blade = new Mesh(new ConeGeometry(0.03, 0.2 + wobble(seed + i, 1) * 0.06, 4), matte(NATURE.grassBlade));
+    const blade = new Mesh(new ConeGeometry(0.03, 0.2 + wobble(seed + i, 1) * 0.06, 4), matte(i % 4 === 0 ? NATURE.grass : NATURE.grassBlade));
     blade.castShadow = true;
-    blade.position.set(wobble(seed + i, 2) * 0.14, 0.12, wobble(seed + i, 3) * 0.14);
+    blade.position.set(wobble(seed + i, 2) * 0.17, 0.12, wobble(seed + i, 3) * 0.17);
     blade.rotation.z = wobble(seed + i, 4) * 0.4;
     group.add(blade);
   }
@@ -201,7 +201,7 @@ function drop(group: Group, prop: Group | Mesh, x: number, z: number, scale: num
   group.add(prop);
 }
 
-/** A forest tile: three small trees clustered on grass. */
+/** A forest tile: three trees over grass and low undergrowth, filled in. */
 export function createForestTile(seed = 1): Group {
   const group = new Group();
   group.add(createGroundTile(NATURE.grass));
@@ -214,69 +214,86 @@ export function createForestTile(seed = 1): Group {
     const tree = (seed + i) % 2 ? createBroadleaf(seed * 7 + i) : createPine(seed * 5 + i);
     drop(group, tree, x, z, 0.52);
   });
+  // Undergrowth so the floor is not bare between the trunks.
+  drop(group, createGrassTuft(seed * 13 + 1), 0.3, 0.24, 0.85);
+  drop(group, createGrassTuft(seed * 13 + 2), -0.32, 0.26, 0.85);
+  drop(group, createBush(seed * 13 + 3), 0.26, -0.3, 0.6);
+  drop(group, createFlower(seed * 13 + 4), -0.22, -0.12, 0.9);
   return group;
 }
 
-/** A meadow tile: grass tufts and a couple of flowers. */
+/** A meadow tile: a full spread of grass tufts and flowers. */
 export function createMeadowTile(seed = 1): Group {
   const group = new Group();
   group.add(createGroundTile(NATURE.grass));
-  for (let i = 0; i < 3; i += 1) {
-    drop(group, createGrassTuft(seed * 3 + i), wobble(seed + i, 1) * 0.3, wobble(seed + i, 2) * 0.3, 0.9);
+  for (let i = 0; i < 6; i += 1) {
+    drop(group, createGrassTuft(seed * 3 + i), wobble(seed + i, 1) * 0.36, wobble(seed + i, 2) * 0.36, 0.9);
   }
-  for (let i = 0; i < 2; i += 1) {
-    drop(group, createFlower(seed * 9 + i), wobble(seed + i, 3) * 0.28, wobble(seed + i, 4) * 0.28, 1);
+  for (let i = 0; i < 4; i += 1) {
+    drop(group, createFlower(seed * 9 + i), wobble(seed * 2 + i, 3) * 0.34, wobble(seed * 2 + i, 4) * 0.34, 1);
   }
   return group;
 }
 
-/** A grove tile: one tree with a bush and a rock at its foot. */
+/** A grove tile: a tree ringed by bushes, a rock and grass at its foot. */
 export function createGroveTile(seed = 1): Group {
   const group = new Group();
   group.add(createGroundTile(NATURE.grass));
   const tree = seed % 2 ? createPine(seed * 5) : createBroadleaf(seed * 7);
   drop(group, tree, wobble(seed, 1) * 0.12, wobble(seed, 2) * 0.12, 0.62);
   drop(group, createBush(seed * 2), 0.28, 0.26, 0.7);
+  drop(group, createBush(seed * 2 + 5), -0.26, 0.28, 0.6);
   drop(group, createRock(seed * 4), -0.3, 0.24, 0.55);
+  drop(group, createGrassTuft(seed * 4 + 3), 0.3, -0.26, 0.85);
+  drop(group, createGrassTuft(seed * 4 + 7), -0.06, 0.32, 0.85);
   return group;
 }
 
-/** A rocky tile: a cluster of boulders on bare soil. */
+/** A rocky tile: a cluster of boulders with scattered rubble on bare soil. */
 export function createRockClusterTile(seed = 1): Group {
   const group = new Group();
   group.add(createGroundTile(NATURE.soil));
-  for (let i = 0; i < 3; i += 1) {
-    drop(group, createRock(seed * 6 + i), wobble(seed + i, 1) * 0.28, wobble(seed + i, 2) * 0.28, 0.7 + wobble(seed + i, 3) * 0.2);
+  for (let i = 0; i < 4; i += 1) {
+    drop(group, createRock(seed * 6 + i), wobble(seed + i, 1) * 0.3, wobble(seed + i, 2) * 0.3, 0.7 + wobble(seed + i, 3) * 0.2);
+  }
+  // A litter of pebbles fills the gaps between the big rocks.
+  for (let i = 0; i < 4; i += 1) {
+    drop(group, createRock(seed * 6 + i + 20), wobble(seed * 3 + i, 1) * 0.4, wobble(seed * 3 + i, 2) * 0.4, 0.28);
   }
   return group;
 }
 
-/** A denser meadow: grass tufts under a scatter of bright flowers. */
+/** A denser meadow: grass tufts under a thick scatter of bright flowers. */
 export function createFlowerPatch(seed = 1): Group {
   const group = new Group();
   group.add(createGroundTile(NATURE.grass));
-  for (let i = 0; i < 3; i += 1) {
-    drop(group, createGrassTuft(seed * 3 + i), wobble(seed + i, 1) * 0.32, wobble(seed + i, 2) * 0.32, 0.8);
+  for (let i = 0; i < 5; i += 1) {
+    drop(group, createGrassTuft(seed * 3 + i), wobble(seed + i, 1) * 0.36, wobble(seed + i, 2) * 0.36, 0.85);
   }
-  for (let i = 0; i < 6; i += 1) {
-    drop(group, createFlower(seed * 11 + i), wobble(seed * 2 + i, 3) * 0.34, wobble(seed * 2 + i, 4) * 0.34, 1);
+  for (let i = 0; i < 9; i += 1) {
+    drop(group, createFlower(seed * 11 + i), wobble(seed * 2 + i, 3) * 0.38, wobble(seed * 2 + i, 4) * 0.38, 1);
   }
   return group;
 }
 
 // Plains — extra prop --------------------------------------------------------
 
-/** A taller, fuller grass clump — a coarser variant of the little tuft. */
+/** A taller, fuller stand of grass — several dense clumps, not one wisp. */
 export function createTallGrass(seed = 1): Group {
   const group = new Group();
-  const blades = 7;
-  for (let i = 0; i < blades; i += 1) {
-    const h = 0.32 + wobble(seed + i, 1) * 0.08;
-    const blade = new Mesh(new ConeGeometry(0.028, h, 4), matte(i % 3 === 0 ? NATURE.grass : NATURE.grassBlade));
-    blade.castShadow = true;
-    blade.position.set(wobble(seed + i, 2) * 0.16, h / 2, wobble(seed + i, 3) * 0.16);
-    blade.rotation.z = wobble(seed + i, 4) * 0.35;
-    group.add(blade);
+  const clusters = 3;
+  for (let k = 0; k < clusters; k += 1) {
+    const cx = wobble(seed + k, 5) * 0.24;
+    const cz = wobble(seed + k, 6) * 0.24;
+    const blades = 7;
+    for (let i = 0; i < blades; i += 1) {
+      const h = 0.34 + wobble(seed + k * 3 + i, 1) * 0.08;
+      const blade = new Mesh(new ConeGeometry(0.03, h, 4), matte((i + k) % 3 === 0 ? NATURE.grass : NATURE.grassBlade));
+      blade.castShadow = true;
+      blade.position.set(cx + wobble(seed + i, 2) * 0.1, h / 2, cz + wobble(seed + i, 3) * 0.1);
+      blade.rotation.z = wobble(seed + i, 4) * 0.3;
+      group.add(blade);
+    }
   }
   return group;
 }
@@ -338,22 +355,34 @@ export function createFarmPlot(state: NodeState = 'full'): Group {
   group.add(createGroundTile(0x6f5334));
 
   const rows = 4;
+  const perRow = 7;
   for (let r = 0; r < rows; r += 1) {
     const z = -0.33 + r * 0.22;
-    const ridge = solid(new Mesh(chamferedBox(0.86, 0.06, 0.12, 0.03, 0.01), matte(0x87683f)));
+    const ridge = solid(new Mesh(chamferedBox(0.9, 0.06, 0.14, 0.03, 0.01), matte(0x87683f)));
     ridge.position.set(0, 0.11, z);
     group.add(ridge);
 
     if (state === 'mined') continue; // fallow: bare ridges
 
     const ripe = state === 'full';
-    for (let c = 0; c < 5; c += 1) {
-      const x = -0.34 + c * 0.17;
-      const h = ripe ? 0.16 : 0.08;
-      const crop = new Mesh(new ConeGeometry(ripe ? 0.04 : 0.025, h, 5), matte(ripe ? 0xd2b24a : 0x6fae4c));
-      crop.castShadow = true;
-      crop.position.set(x, 0.14 + h / 2, z);
-      group.add(crop);
+    for (let c = 0; c < perRow; c += 1) {
+      const x = -0.37 + c * (0.74 / (perRow - 1));
+      if (ripe) {
+        // A full-grown stalk with a fat golden grain head on top.
+        const h = 0.26 + wobble(r * 7 + c, 1) * 0.03;
+        const stalk = solid(new Mesh(new CylinderGeometry(0.022, 0.032, h, 5), matte(0xbf9a3a)));
+        stalk.position.set(x, 0.14 + h / 2, z);
+        group.add(stalk);
+        const head = solid(new Mesh(new ConeGeometry(0.06, 0.14, 6), matte(0xe8cf62)));
+        head.position.set(x, 0.14 + h + 0.05, z);
+        group.add(head);
+      } else {
+        // A young green sprout.
+        const h = 0.13;
+        const sprout = solid(new Mesh(new ConeGeometry(0.03, h, 5), matte(0x6fae4c)));
+        sprout.position.set(x, 0.14 + h / 2, z);
+        group.add(sprout);
+      }
     }
   }
 

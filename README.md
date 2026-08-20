@@ -8,6 +8,9 @@ Every unlock deliberately introduces one new language concept — loops, conditi
 arrays, objects, `async`/`await` — explained in a short panel with a runnable example. Inspired by
 *The Farmer Was Replaced*.
 
+**Play it: [factory-os-pearl-beta.vercel.app](https://factory-os-pearl-beta.vercel.app)** — the deployed
+build, which is whatever the latest GitHub release published.
+
 ## Status
 
 **Phase 10a of 10 — the factory grows what it uses.** Press `E` for the editor, uncomment the
@@ -73,6 +76,8 @@ A phase is only done when typecheck, tests and build all pass, and the browser c
 phase has been done by hand.
 
 ## Deploying
+
+The live build is at **https://factory-os-pearl-beta.vercel.app**.
 
 Merging to `main` does not publish anything. `vercel.json` disables automatic deployment for
 `main`, and the only thing that ships is **publishing a GitHub release** — the workflow in

@@ -15,6 +15,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         styleguide: fileURLToPath(new URL('./styleguide.html', import.meta.url)),
+        showroom: fileURLToPath(new URL('./showroom.html', import.meta.url)),
       },
     },
   },

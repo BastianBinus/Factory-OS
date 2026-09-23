@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tonspur">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1318" media="(prefers-color-scheme: dark)">
+<title>Tonspur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #eef1f4;
+    --surface: #ffffff;
+    --ink: #151a22;
+    --muted: #5b6573;
+    --line: #d5dbe3;
+    --accent: #0f6d66;
+    --accent-ink: #ffffff;
+    --accent-soft: #d8ece9;
+    --wave: #9aa6b4;
+    --warn: #8a4b00;
+    --warn-soft: #fbead3;
+    --sans: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --ground: #0f1318;
+      --surface: #171c23;
+      --ink: #e6ebf1;
+      --muted: #93a0b0;
+      --line: #2a323d;
+      --accent: #45c2b3;
+      --accent-ink: #06201d;
+      --accent-soft: #15332f;
+      --wave: #4c5868;
+      --warn: #f3b76b;
+      --warn-soft: #3a2a14;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.5 var(--sans);
+    padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(32px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+  main { max-width: 620px; margin: 0 auto; display: grid; gap: 20px; }
+
+  header h1 { margin: 0; font-size: 28px; line-height: 1.1; font-weight: 600; letter-spacing: -0.01em; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    display: grid;
+    gap: 16px;
+  }
+
+  .file {
+    display: flex; align-items: center; gap: 12px;
+    border: 1.5px dashed var(--line); border-radius: 10px;
+    padding: 14px; cursor: pointer; min-height: 64px;
+  }
+  .file:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .file input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .file .glyph {
+    flex: none; width: 36px; height: 36px; border-radius: 8px;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center;
+  }
+  .file .name { font-weight: 600; overflow-wrap: anywhere; }
+  .file .meta { color: var(--muted); font-size: 14px; font-family: var(--mono); }
+
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  legend { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; padding: 0; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--ground); border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg label {
+    text-align: center; padding: 8px 4px; border-radius: 8px; cursor: pointer;
+    font-size: 15px; line-height: 1.25; color: var(--muted);
+  }
+  .seg label small { display: block; font-family: var(--mono); font-size: 12px; }
+  .seg input:checked + label { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+  .seg input:focus-visible + label { outline: 2px solid var(--accent); }
+
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; }
+  .check input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--accent); }
+  .check span small { display: block; color: var(--muted); font-size: 13px; }
+
+  button { font: inherit; }
+  .primary {
+    width: 100%; min-height: 52px; border: 0; border-radius: 12px;
+    background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 17px; cursor: pointer;
+  }
+  .primary:disabled { opacity: 0.45; cursor: default; }
+  .primary:focus-visible, .ghost:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .ghost {
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    border-radius: 9px; padding: 7px 14px; cursor: pointer; font-size: 15px;
+  }
+
+  .status { display: grid; gap: 10px; }
+  .status-line { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+  .status-line .num { font-family: var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .bar { height: 6px; border-radius: 3px; background: var(--ground); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.25s; }
+  canvas.wave { width: 100%; height: 56px; display: block; }
+
+  .notice { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+
+  .transcript-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .transcript-head h2 { margin: 0; font-size: 18px; }
+  .tag { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+  .segments { display: grid; gap: 14px; }
+  .segment { display: grid; grid-template-columns: 74px 1fr; gap: 10px; }
+  .segment .tc { font-family: var(--mono); font-size: 13px; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .segment .tc b { display: inline-block; margin-top: 2px; font-weight: 500; color: var(--accent); }
+  .segment p { margin: 0; overflow-wrap: anywhere; }
+  .segment.quiet p { color: var(--muted); font-style: italic; }
+  .example .segments { opacity: 0.6; }
+
+  footer { color: var(--muted); font-size: 13px; max-width: 62ch; }
+  footer p { margin: 0 0 6px; }
+
+  @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Tonspur</h1>
+    <p>Turns a video into text, right on your phone. Speech in German, English or a mix of both.</p>
+  </header>
+
+  <section class="panel" aria-label="Setup">
+    <label class="file" for="file">
+      <input id="file" type="file" accept="video/*,audio/*">
+      <span class="glyph" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="4" width="11" height="12" rx="2"/><path d="M13 8.5l5-2.5v8l-5-2.5"/></svg>
+      </span>
+      <span>
+        <span class="name" id="file-name">Choose a video</span><br>
+        <span class="meta" id="file-meta">From Photos or Files</span>
+      </span>
+    </label>
+
+    <fieldset>
+      <legend>Model</legend>
+      <div class="seg">
+        <input type="radio" name="model" id="m-tiny" value="tiny"><label for="m-tiny">Tiny<small>≈60 MB</small></label>
+        <input type="radio" name="model" id="m-base" value="base" checked><label for="m-base">Base<small>≈135 MB</small></label>
+        <input type="radio" name="model" id="m-small" value="small"><label for="m-small">Small<small>≈250 MB</small></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Spoken language</legend>
+      <div class="seg">
+        <input type="radio" name="lang" id="l-auto" value="auto" checked><label for="l-auto">DE + EN<small>per 30 s</small></label>
+        <input type="radio" name="lang" id="l-de" value="de"><label for="l-de">German</label>
+        <input type="radio" name="lang" id="l-en" value="en"><label for="l-en">English</label>
+      </div>
+    </fieldset>
+
+    <label class="check" for="gpu">
+      <input type="checkbox" id="gpu">
+      <span>Use the GPU<small>Faster where it works. Some iPhones fail on it, and Tonspur then switches to the CPU on its own.</small></span>
+    </label>
+
+    <button class="primary" id="start" disabled>Transcribe</button>
+
+    <div class="status" id="status" hidden>
+      <div class="status-line"><span id="stage">Reading the video…</span><span class="num" id="stage-num"></span></div>
+      <div class="bar"><i id="bar"></i></div>
+      <canvas class="wave" id="wave" hidden></canvas>
+      <div class="notice" id="notice" hidden></div>
+      <button class="ghost" id="cancel" hidden>Stop</button>
+    </div>
+  </section>
+
+  <section class="panel example" id="result" aria-label="Transcript">
+    <div class="transcript-head">
+      <h2>Transcript</h2>
+      <span class="tag" id="result-tag">Example</span>
+      <button class="ghost" id="copy" hidden>Copy text</button>
+    </div>
+    <div class="segments" id="segments">
+      <div class="segment"><div class="tc">00:00:00<br><b>DE</b></div><p>Okay, kurzer Rundgang durch die neue Werkstatt. Links die Drehbank, die haben wir letzte Woche endlich angeschlossen.</p></div>
+      <div class="segment"><div class="tc">00:00:27<br><b>EN</b></div><p>And for the folks watching from the Austin team: this is the fixture we talked about on Monday's call.</p></div>
+      <div class="segment"><div class="tc">00:00:55<br><b>DE</b></div><p>Die Spannvorrichtung hält jetzt bis zu vier Teile gleichzeitig, das spart uns pro Schicht locker eine Stunde.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <p>The audio never leaves this phone. The only download is the speech model, from Hugging Face, the first time you use it. After that it's stored on the phone.</p>
+    <p>Safari clears stored data from sites you haven't opened in 7 days. Use <i>Share → Add to Home Screen</i> to keep the model.</p>
+    <p>Keep this tab open and the screen on while it runs. iOS pauses tabs in the background.</p>
+  </footer>
+</main>
+
+<script type="module">
+const SR = 16000;
+const $ = (id) => document.getElementById(id);
+const els = {
+  file: $('file'), fileName: $('file-name'), fileMeta: $('file-meta'),
+  start: $('start'), status: $('status'), stage: $('stage'), stageNum: $('stage-num'),
+  bar: $('bar'), wave: $('wave'), notice: $('notice'), cancel: $('cancel'),
+  result: $('result'), resultTag: $('result-tag'), segments: $('segments'), copy: $('copy'),
+};
+
+// ---- remembered settings -------------------------------------------------
+const store = {
+  get(k) { try { return localStorage.getItem('tonspur.' + k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('tonspur.' + k, v); } catch {} },
+};
+for (const name of ['model', 'lang']) {
+  const saved = store.get(name);
+  const input = saved && document.querySelector(`input[name="${name}"][value="${saved}"]`);
+  if (input) input.checked = true;
+  document.querySelectorAll(`input[name="${name}"]`).forEach((el) =>
+    el.addEventListener('change', () => store.set(name, el.value)));
+}
+els.gpu = $('gpu');
+els.gpu.checked = store.get('gpu') === '1';
+els.gpu.addEventListener('change', () => store.set('gpu', els.gpu.checked ? '1' : '0'));
+if (!('gpu' in navigator)) {
+  els.gpu.checked = false;
+  els.gpu.disabled = true;
+}
+
+const setting = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+
+// ---- helpers ---------------------------------------------------------------
+const mb = (bytes) => (bytes / 1e6).toFixed(bytes < 1e8 ? 1 : 0) + ' MB';
+const timecode = (s) => {
+  const t = Math.floor(s);
+  return [Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60].map((n) => String(n).padStart(2, '0')).join(':');
+};
+const duration = (s) => {
+  if (!isFinite(s)) return '';
+  const m = Math.round(s / 60);
+  return m < 1 ? `${Math.max(1, Math.round(s))} s` : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+};
+
+function showNotice(text) {
+  els.notice.textContent = text;
+  els.notice.hidden = !text;
+}
+
+// ---- file selection ------------------------------------------------------
+let file = null;
+els.file.addEventListener('change', () => {
+  file = els.file.files[0] ?? null;
+  els.start.disabled = !file;
+  if (!file) return;
+  els.fileName.textContent = file.name;
+  els.fileMeta.textContent = mb(file.size);
+  // Safari has to hold the whole file and its decoded audio in memory at once.
+  if (file.size > 1e9) {
+    els.status.hidden = false;
+    els.stage.textContent = 'Ready';
+    showNotice('This is a big video. Safari may run out of memory and reload the page. If it does, trim the video in Photos first, or export it at a lower resolution.');
+  } else {
+    showNotice('');
+  }
+});
+
+// ---- decoding --------------------------------------------------------------
+// Whisper wants 16 kHz mono. Asking the AudioContext for 16 kHz makes the browser
+// resample while decoding, which also keeps memory low (4 MB per minute of audio,
+// instead of 23 MB at 48 kHz stereo). If the browser refuses that rate, decode at
+// its native rate and downsample here.
+async function decode(buffer) {
+  let ctx;
+  try {
+    ctx = new AudioContext({ sampleRate: SR });
+  } catch {
+    ctx = new AudioContext();
+  }
+  try {
+    const decoded = await ctx.decodeAudioData(buffer);
+    return toMono16k(decoded);
+  } finally {
+    ctx.close?.();
+  }
+}
+
+function toMono16k(decoded) {
+  const channels = decoded.numberOfChannels;
+  const len = decoded.length;
+  const mono = new Float32Array(len);
+  for (let c = 0; c < channels; c++) {
+    const data = decoded.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += data[i] / channels;
+  }
+  if (decoded.sampleRate === SR) return mono;
+  // Box-filter downsampling: averaging each output sample's source window is
+  // enough anti-aliasing for speech, which carries little energy above 8 kHz.
+  const ratio = decoded.sampleRate / SR;
+  const out = new Float32Array(Math.floor(len / ratio));
+  for (let i = 0; i < out.length; i++) {
+    const a = Math.floor(i * ratio);
+    const b = Math.min(len, Math.max(a + 1, Math.floor((i + 1) * ratio)));
+    let sum = 0;
+    for (let j = a; j < b; j++) sum += mono[j];
+    out[i] = sum / (b - a);
+  }
+  return out;
+}
+
+// ---- chunking ----------------------------------------------------------------
+// Whisper hears 30 s at a time. Cutting blindly at 30 s splits words, so each cut
+// lands on the quietest 100 ms between 24 s and 30 s into the chunk. Chunks with
+// no speech are skipped: Whisper invents text on silence.
+function rms(audio, from, to) {
+  let sum = 0;
+  for (let i = from; i < to; i++) sum += audio[i] * audio[i];
+  return Math.sqrt(sum / Math.max(1, to - from));
+}
+
+function planChunks(audio) {
+  const n = audio.length;
+  const frame = SR / 10;
+  const chunks = [];
+  let start = 0;
+  while (start < n) {
+    let end = n;
+    if (n - start > 30 * SR) {
+      let best = start + 30 * SR;
+      let bestLevel = Infinity;
+      for (let f = start + 24 * SR; f + frame <= start + 30 * SR; f += frame) {
+        const level = rms(audio, f, f + frame);
+        if (level < bestLevel) { bestLevel = level; best = f + frame / 2; }
+      }
+      end = Math.round(best);
+    }
+    const silent = end - start < SR / 2 || rms(audio, start, end) < 0.004;
+    chunks.push({ start, end, silent });
+    start = end;
+  }
+  return chunks;
+}
+
+// ---- waveform ----------------------------------------------------------------
+let peaks = null;
+let chunkState = [];
+let lastWave = null;
+
+function computePeaks(audio, buckets) {
+  const out = new Float32Array(buckets);
+  const step = audio.length / buckets;
+  let max = 1e-6;
+  for (let b = 0; b < buckets; b++) {
+    const from = Math.floor(b * step);
+    const to = Math.min(audio.length, Math.floor((b + 1) * step));
+    let peak = 0;
+    for (let i = from; i < to; i += 8) peak = Math.max(peak, Math.abs(audio[i]));
+    out[b] = peak;
+    max = Math.max(max, peak);
+  }
+  for (let b = 0; b < buckets; b++) out[b] /= max;
+  return out;
+}
+
+function drawWave(chunks, total) {
+  const canvas = els.wave;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  lastWave = [chunks, total];
+  if (!w || !peaks) return;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  const g = canvas.getContext('2d');
+  g.scale(dpr, dpr);
+  const css = getComputedStyle(document.documentElement);
+  const colors = {
+    todo: css.getPropertyValue('--wave').trim(),
+    done: css.getPropertyValue('--accent').trim(),
+    line: css.getPropertyValue('--line').trim(),
+  };
+  const bar = w / peaks.length;
+  for (let b = 0; b < peaks.length; b++) {
+    const t = ((b + 0.5) / peaks.length) * total;
+    const idx = chunks.findIndex((c) => t * SR < c.end);
+    g.fillStyle = chunkState[idx] ? colors.done : colors.todo;
+    const bh = Math.max(1.5, peaks[b] * (h - 4));
+    g.fillRect(b * bar + 0.5, (h - bh) / 2, Math.max(1, bar - 1), bh);
+  }
+  // Mark where each chunk was cut.
+  g.fillStyle = colors.line;
+  for (const c of chunks.slice(0, -1)) g.fillRect((c.end / SR / total) * w, 0, 1, h);
+}
+
+// ---- transcript ------------------------------------------------------------
+let segments = [];
+
+function renderSegment(seg) {
+  const row = document.createElement('div');
+  row.className = 'segment' + (seg.text ? '' : ' quiet');
+  const tc = document.createElement('div');
+  tc.className = 'tc';
+  tc.textContent = timecode(seg.start);
+  if (seg.lang) {
+    tc.append(document.createElement('br'));
+    const b = document.createElement('b');
+    b.textContent = seg.lang.toUpperCase();
+    tc.append(b);
+  }
+  const p = document.createElement('p');
+  p.textContent = seg.text || 'No speech';
+  row.append(tc, p);
+  els.segments.append(row);
+}
+
+function plainText() {
+  return segments.filter((s) => s.text).map((s) => s.text).join(' ');
+}
+
+els.copy.addEventListener('click', async () => {
+  const text = plainText();
+  try {
+    await navigator.clipboard.writeText(text);
+    els.copy.textContent = 'Copied';
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(els.segments);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    els.copy.textContent = 'Selected, tap Copy';
+  }
+  setTimeout(() => (els.copy.textContent = 'Copy text'), 2000);
+});
+
+// ---- run -------------------------------------------------------------------
+let worker = null;
+let wakeLock = null;
+
+async function holdScreen(on) {
+  try {
+    if (on && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch { /* not granted: the footer already asks to keep the screen on */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && worker && !wakeLock) holdScreen(true);
+});
+
+function setBusy(busy) {
+  els.start.disabled = busy || !file;
+  els.file.disabled = busy;
+  els.cancel.hidden = !busy;
+  document.querySelectorAll('fieldset input, #gpu').forEach((el) => (el.disabled = busy || (el.id === 'gpu' && !('gpu' in navigator))));
+}
+
+els.cancel.addEventListener('click', () => {
+  worker?.postMessage({ type: 'cancel' });
+  els.stage.textContent = 'Stopping after this part…';
+});
+
+els.start.addEventListener('click', async () => {
+  if (!file) return;
+  setBusy(true);
+  holdScreen(true);
+  els.status.hidden = false;
+  els.wave.hidden = true;
+  showNotice('');
+  els.bar.style.width = '0%';
+  els.stage.textContent = 'Reading the video…';
+  els.stageNum.textContent = '';
+
+  let audio;
+  try {
+    audio = await decode(await file.arrayBuffer());
+  } catch (err) {
+    els.stage.textContent = 'Could not read the sound from this video';
+    showNotice('Safari could not decode this file\'s audio track. Try exporting it again from Photos, or share the video as an audio file (for example .m4a).');
+    setBusy(false);
+    holdScreen(false);
+    return;
+  }
+
+  const total = audio.length / SR;
+  const chunks = planChunks(audio);
+  const speaking = chunks.filter((c) => !c.silent).length;
+  peaks = computePeaks(audio, 160);
+  chunkState = [];
+  els.wave.hidden = false;
+  drawWave(chunks, total);
+
+  segments = [];
+  els.segments.replaceChildren();
+  els.result.classList.remove('example');
+  els.resultTag.hidden = true;
+  els.copy.hidden = true;
+
+  worker ??= new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+  const started = performance.now();
+  let spentMs = 0;
+  let doneSpeaking = 0;
+
+  const finish = (label) => {
+    els.stage.textContent = label;
+    els.stageNum.textContent = '';
+    els.copy.hidden = !plainText();
+    setBusy(false);
+    holdScreen(false);
+  };
+
+  worker.onmessage = ({ data }) => {
+    switch (data.type) {
+      case 'stage':
+        if (data.stage === 'loading') {
+          els.stage.textContent = 'Loading the speech model…';
+        } else {
+          els.stage.textContent = `Transcribing ${duration(total)} of audio`;
+          els.bar.style.width = '0%';
+        }
+        break;
+      case 'download':
+        els.stage.textContent = 'Downloading the speech model (only the first time)';
+        els.stageNum.textContent = `${mb(data.loaded)} / ${mb(data.total)}`;
+        els.bar.style.width = `${(100 * data.loaded) / data.total}%`;
+        break;
+      case 'notice':
+        showNotice(data.text);
+        break;
+      case 'segment': {
+        segments.push(data);
+        renderSegment(data);
+        chunkState[data.index] = true;
+        drawWave(chunks, total);
+        if (data.text || data.lang) { doneSpeaking++; spentMs += data.ms; }
+        const left = speaking - doneSpeaking;
+        const eta = doneSpeaking ? (spentMs / doneSpeaking) * left / 1000 : NaN;
+        els.bar.style.width = `${(100 * (data.index + 1)) / chunks.length}%`;
+        els.stageNum.textContent = left > 0 && isFinite(eta) ? `≈${duration(eta)} left` : '';
+        els.copy.hidden = !plainText();
+        break;
+      }
+      case 'done':
+        finish(`Done in ${duration((performance.now() - started) / 1000)}`);
+        break;
+      case 'cancelled':
+        finish('Stopped');
+        break;
+      case 'error':
+        finish('Something went wrong');
+        showNotice(`${data.text}. If this happened while the model was loading, check the connection and try again. With the GPU switched on, try it off.`);
+        worker.terminate();
+        worker = null;
+        break;
+    }
+  };
+
+  const device = els.gpu.checked ? 'webgpu' : 'wasm';
+  worker.postMessage(
+    { type: 'run', audio, chunks, model: setting('model'), language: setting('lang'), device },
+    [audio.buffer],
+  );
+});
+
+addEventListener('resize', () => { if (lastWave && !els.wave.hidden) drawWave(...lastWave); });
+</script>
+</body>
+</html>
